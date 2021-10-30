@@ -173,11 +173,12 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
 void do_dump(void)
 {
     log_msg("Coroutine dump for %d bytes requested\n", cr_args);
+    static int ch = 0;
     long s1, s2;
-    uint8_t buf[cr_args];
+    uint8_t *buf = new uint8_t[cr_args];
     for (int i = 0; i < cr_args; i++)
     {
-        buf[i] = charset_p_topetcii('a'+(i % 27));
+        buf[i] = charset_p_topetcii('a'+((i + ch++) % 27));
     }
     s1 = millis();
     drv->write((const char *)buf, cr_args);
@@ -186,6 +187,7 @@ void do_dump(void)
     log_msg("%dms(", s2 - s1);
     float baud = ((float)cr_args) / (s2 - s1) * 8000;
     log_msg("%.0f)\n", baud);
+    delete[] buf;
 }
 
 void do_echo(const char *what)
@@ -231,7 +233,6 @@ void loop()
     int ret = drv->read(buf, 4);
     buf[ret] = '\0';
     cr = process_cmd(buf);
-    delay(50);
     switch (cr)
     {
     case IDLE:

@@ -6,7 +6,9 @@
 #include "misc.h"
 #include "logger.h"
 
-#define MAX_AUX 4096
+#define MAX_AUX (1024 * 16)
+
+extern void udelay(unsigned long us);
 
 class pp_drv
 {
@@ -69,7 +71,7 @@ protected:
     }
 
 public:
-    pp_drv(uint16_t qs = 4096, uint16_t bs = 4096);
+    pp_drv(uint16_t qs = MAX_AUX, uint16_t bs = MAX_AUX);
     ~pp_drv();
 
     void setup_rcv(void);

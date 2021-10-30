@@ -4,7 +4,7 @@
 #include "misc.h"
 #include "logger.h"
 
-static void udelay(unsigned long us)
+void udelay(unsigned long us)
 {
     unsigned long st = micros();
     while ((micros() - st) < us)
@@ -107,9 +107,12 @@ void pp_drv::pc2_isr(void)
                 //log_msg_isr("would send from ISR" + c + '\n');
                 outchar(c);
                 flag_handshake();
-                udelay(50);
+                //udelay(50);
                 while (digitalRead(PA2) != HIGH)
+                {
                     ;
+                    //udelay(5);
+                }
             }
         }
         else
@@ -122,7 +125,7 @@ void pp_drv::pc2_isr(void)
 
         while (digitalRead(PA2) != LOW)
             ;
-        udelay(50);
+        udelay(15);
     }
 }
 
@@ -165,25 +168,8 @@ void pp_drv::drv_body(void)
     {
         while (xQueueReceive(rx_queue, &c, portMAX_DELAY) == pdTRUE)
         {
+            //log_msg("pp - rcv: '%c'/0x%02x\n", (c? c : '~'), c);
             ring_buf.put(c);
-#if 0            
-            //log_msg("pp - rcv: '%c'/0x%02x/%d\n", c, c, idx);
-            buffer[idx++] = c;
-            if (c == '\0')
-            {
-                String *line = new String{buffer};
-                // log_msg("line: %s\n", line->c_str());
-                idx = 0;
-                P(mutex);
-                rqueue.push_back(line);
-                V(mutex);
-            }
-            if (idx >= bs)
-            {
-                log_msg("queue overflow, discarding: %s(%d)\n", buffer, idx);
-                idx = 0;
-            }
-#endif
         }
     }
 }
@@ -222,7 +208,7 @@ void pp_drv::setup_rcv(void)
 
 void pp_drv::open(void)
 {
-    blink(100, 3);
+    ///blink(100, 3);
     pinMode(PA2, INPUT);
     pinMode(PC2, INPUT_PULLDOWN);
     pinMode(FLAG, OUTPUT);
@@ -266,8 +252,6 @@ int pp_drv::read(char *buf, int len, bool block)
     {
         buf[count++] = c;
         len--;
-        if (c == '\0')
-            break;
     }
     return count;
 }
@@ -285,7 +269,7 @@ void pp_drv::outchar(const char ct) // also called from ISR context!
 int pp_drv::write(const char *str, int len)
 {
     //log_msg("write of %d chars - %s\n", len, str);
-    if (!len && (len > qs))
+    if ((len == 0) || (len >= qs))
         return -1;
     setup_snd();
     if (len--)
@@ -301,17 +285,14 @@ int pp_drv::write(const char *str, int len)
     while (len--)
     {
         if (xQueueSend(tx_queue, str, 200 * portTICK_PERIOD_MS) != pdTRUE)
-            log_msg("xQueue failed for %c\n", *str);
+            log_msg("xQueueSend failed for %c, remaining: %d\n", *str, len);
         str++;
     }
     flag_handshake();
-    log_msg("waiting for chars to be sent...\n");
+    //log_msg("waiting for chars to be sent...\n");
     unsigned long t1 = millis();
     P(out_mutex);
-    log_msg("out took: %dms\n", millis() - t1);
-    log_msg("done.\n");
-
-    //delay(20);
+    //log_msg("out took: %dms\n", millis() - t1);
     setup_rcv();
     return 0;
 }
