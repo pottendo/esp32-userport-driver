@@ -33,6 +33,8 @@ class pp_drv
     const uint8_t par_pins[11] = {13, 4, 16, 17, 5, 18, 19, 22, 23, 21, 15};
     QueueHandle_t rx_queue;
     QueueHandle_t tx_queue;
+    QueueHandle_t s1_queue;
+    QueueHandle_t s2_queue;
 
     std::list<String *> rqueue;
     uint8_t mode;

@@ -63,7 +63,7 @@ public:
     {
         P(wmutex);
         buffer[w] = item;
-        w = (++w) % size;
+        w++; w %= size;
         V(rmutex);
     }
     inline bool get(T &item, bool block = true)
@@ -76,7 +76,7 @@ public:
         }
 
         item = buffer[r];
-        r = (++r) % size;
+        r++; r %= size;
         V(wmutex);
         return true;
     }

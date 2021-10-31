@@ -5,7 +5,6 @@
 
 static pp_drv *drv;
 
-static char cmd_buf[1024];
 typedef enum
 {
     IDLE,
@@ -29,9 +28,9 @@ void setup()
     //drv.setup_sender();
 }
 
-coroutine_t process_cmd(const char *cmd)
+coroutine_t process_cmd(char *cmd)
 {
-    const char *cmd_buf = cmd;
+    char *cmd_buf = cmd;
     static char aux_buf[MAX_AUX];
     while (*cmd_buf)
     {
@@ -62,7 +61,14 @@ coroutine_t process_cmd(const char *cmd)
             cr_args = b;
             return READ;
         }
-        cmd_buf++;
+        strncpy(cmd_buf, cmd_buf + 1, 4);
+        int ret = drv->read(cmd_buf + 4, 1);
+        if (ret != 1)
+        {
+            log_msg("process_cmd, read error: %d\n", ret);
+            break;
+        }
+        cmd_buf[5] = '\0';
     }
     log_msg("Unknown command: %s\n", cmd);
 
@@ -178,7 +184,7 @@ void do_dump(void)
     uint8_t *buf = new uint8_t[cr_args];
     for (int i = 0; i < cr_args; i++)
     {
-        buf[i] = charset_p_topetcii('a'+((i + ch++) % 27));
+        buf[i] = charset_p_topetcii('a' + ((i + ch++) % 27));
     }
     s1 = millis();
     drv->write((const char *)buf, cr_args);
@@ -220,7 +226,6 @@ void do_read(void)
 
 void loop()
 {
-    String *line;
     coroutine_t cr = IDLE;
 
     log_msg("Waiting for command from c64...\n");
@@ -229,31 +234,36 @@ void loop()
     log_msg(String("C64 sent: '") + (*line) + "'\n");
     cr = process_cmd(line->c_str());
 #endif
-    char buf[256];
+    static char buf[MAX_AUX];
     int ret = drv->read(buf, 4);
-    buf[ret] = '\0';
-    cr = process_cmd(buf);
-    switch (cr)
+    if (ret == 4)
     {
-    case IDLE:
-        break;
-    case ECHO:
-        do_echo(cr_argsstr);
-        cr_argsstr = nullptr;
-        cr = IDLE;
-        break;
-    case DUMP:
-        cr = IDLE;
-        do_dump();
-        break;
-    case READ:
-        cr = IDLE;
-        do_read();
-        break;
-    default:
-        log_msg("Unknown CoRoutine... %d", cr);
-        break;
+        buf[ret] = '\0';
+        cr = process_cmd(buf);
+        switch (cr)
+        {
+        case IDLE:
+            break;
+        case ECHO:
+            do_echo(cr_argsstr);
+            cr_argsstr = nullptr;
+            cr = IDLE;
+            break;
+        case DUMP:
+            cr = IDLE;
+            do_dump();
+            break;
+        case READ:
+            cr = IDLE;
+            do_read();
+            break;
+        default:
+            log_msg("Unknown CoRoutine... %d", cr);
+            break;
+        }
     }
+    else
+        log_msg("read error: %d\n", ret);
     //delete line;
     loop_log();
     delay(100);

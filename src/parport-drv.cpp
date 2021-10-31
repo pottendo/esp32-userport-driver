@@ -96,6 +96,7 @@ void pp_drv::pc2_isr(void)
     if (mode == OUTPUT)
     {
         //log_msg_isr("pc2 isr - output\n");
+        int8_t err = 0;
         BaseType_t xTaskWokenByReceive = pdFALSE;
         char c;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
@@ -108,23 +109,51 @@ void pp_drv::pc2_isr(void)
                 outchar(c);
                 flag_handshake();
                 //udelay(50);
+                unsigned long to = micros();
                 while (digitalRead(PA2) != HIGH)
                 {
-                    ;
-                    //udelay(5);
+                    if ((micros() - to) > 250)
+                    {
+                        log_msg_isr("TC2 handshake1 - C64 not responding.\n");
+                        err = -1;
+                        break;
+                    }
                 }
+                //log_msg_isr("tc2 handshake 1 took %ldus\n", micros() - to);
             }
         }
         else
         {
             //log_msg_isr("last char sent, releasing mutex\n");
-            V(isr_mutex);
+            if (xQueueSendToBackFromISR(s1_queue, &err, &higherPriorityTaskWoken) == errQUEUE_FULL)
+                log_msg_isr("TC2 can't release write.\n");
+        }
+        if (!err)
+        {
+            unsigned long to = micros();
+            while (digitalRead(PA2) != LOW)
+            {
+                if ((micros() - to) > 250)
+                {
+                    log_msg_isr("TC2 handshake2 - C64 not responding.\n");
+                    err = true;
+                    break;
+                }
+            }
+            //log_msg_isr("tc2 handshake 2 took %ldus\n", micros() - to);
+        }
+        if (err)
+        {
+            // in case of error empty queue
+            while (uxQueueMessagesWaitingFromISR(tx_queue))
+            {
+                xQueueReceiveFromISR(tx_queue,
+                                     (void *)&c,
+                                     &xTaskWokenByReceive);
+            }
         }
         if (xTaskWokenByReceive != pdFALSE)
             taskYIELD();
-
-        while (digitalRead(PA2) != LOW)
-            ;
         udelay(15);
     }
 }
@@ -137,12 +166,13 @@ pp_drv::pp_drv(uint16_t qs, uint16_t bs)
 {
     mutex = xSemaphoreCreateBinary();
     V(mutex);
-    out_mutex = xSemaphoreCreateBinary();
-    isr_mutex = xSemaphoreCreateBinary();
     read_mutex = xSemaphoreCreateBinary();
     active_drv = this;
     rx_queue = xQueueCreate(qs, sizeof(char));
     tx_queue = xQueueCreate(qs, sizeof(char));
+    s1_queue = xQueueCreate(1, sizeof(int8_t));
+    s2_queue = xQueueCreate(1, sizeof(int8_t));
+
     xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 2000, this, uxTaskPriorityGet(nullptr) + 1, &th);
 }
@@ -158,12 +188,9 @@ pp_drv::~pp_drv()
 
 void pp_drv::drv_body(void)
 {
-    char c, *buffer;
-    uint16_t idx;
+    char c;
     log_msg("driver launched at priority %d\n", uxTaskPriorityGet(nullptr));
 
-    buffer = new char[bs]; // never delete[]ed
-    idx = 0;
     while (true)
     {
         while (xQueueReceive(rx_queue, &c, portMAX_DELAY) == pdTRUE)
@@ -179,8 +206,14 @@ void pp_drv::drv_ackrcv(void)
     log_msg("drv rcv task launched with priority %d\n", uxTaskPriorityGet(nullptr));
     while (true)
     {
-        P(isr_mutex);
-        V(out_mutex);
+        //P(isr_mutex);
+        int8_t err;
+        if (xQueueReceive(s1_queue, &err, portMAX_DELAY) == pdTRUE)
+        {
+            if (xQueueSend(s2_queue, &err, 20 & portTICK_PERIOD_MS) == pdTRUE)
+                continue;
+        }
+        log_msg("queue s1/s2 failed.\n");
     }
 }
 
@@ -268,6 +301,7 @@ void pp_drv::outchar(const char ct) // also called from ISR context!
 
 int pp_drv::write(const char *str, int len)
 {
+    int ret = len;
     //log_msg("write of %d chars - %s\n", len, str);
     if ((len == 0) || (len >= qs))
         return -1;
@@ -290,9 +324,18 @@ int pp_drv::write(const char *str, int len)
     }
     flag_handshake();
     //log_msg("waiting for chars to be sent...\n");
-    unsigned long t1 = millis();
-    P(out_mutex);
+    //unsigned long t1 = millis();
+    //P(out_mutex);
+    int8_t err;
+    if (xQueueReceive(s2_queue, &err, portMAX_DELAY) == pdTRUE) 
+    {
+        if (err != 0)
+        {
+            log_msg("write error: %d\n", err);
+            ret = -1;
+        }
+    }
     //log_msg("out took: %dms\n", millis() - t1);
     setup_rcv();
-    return 0;
+    return ret;
 }
