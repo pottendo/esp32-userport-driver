@@ -282,7 +282,7 @@ int pp_drv::read(char *buf, int len, bool block)
     int count = 0;
     char c;
     while (len)
-    { 
+    {
         if (!ring_buf.get(c, block))
             return -1;
         buf[count++] = c;
@@ -308,16 +308,16 @@ int pp_drv::write(const char *str, int len)
     if ((len == 0) || (len >= qs))
         return -1;
     setup_snd();
-    if (len--)
+    while (digitalRead(PA2) == HIGH)
     {
-        while (digitalRead(PA2) == HIGH)
-        {
-            log_msg("c64 busy...\n");
-            delay(500);
-        }
-        outchar(*str);
-        str++;
+        log_msg("c64 busy...\n");
+        delay(500);
     }
+    //log_msg("waiting for chars to be sent...\n");
+    unsigned long t1 = millis(), t2;
+    outchar(*str);
+    str++;
+    len--;
     while (len--)
     {
         if (xQueueSend(tx_queue, str, 200 * portTICK_PERIOD_MS) != pdTRUE)
@@ -325,19 +325,23 @@ int pp_drv::write(const char *str, int len)
         str++;
     }
     flag_handshake();
-    //log_msg("waiting for chars to be sent...\n");
-    //unsigned long t1 = millis();
-    //P(out_mutex);
     int8_t err;
-    if (xQueueReceive(s2_queue, &err, portMAX_DELAY) == pdTRUE) 
+    float baud;
+    if (xQueueReceive(s2_queue, &err, portMAX_DELAY) == pdTRUE)
     {
         if (err != 0)
         {
             log_msg("write error: %d\n", err);
-            ret = -1;
+            ret = -1; 
+            goto out;
         }
     }
-    //log_msg("out took: %dms\n", millis() - t1);
+    t2 = millis();
+    log_msg("sent %d chars in ", ret);
+    log_msg("%dms(", t2 - t1);
+    baud = ((float)ret) / (t2 - t1) * 8000;
+    log_msg("%.0fBaud)\n", baud);
+out:
     setup_rcv();
     return ret;
 }

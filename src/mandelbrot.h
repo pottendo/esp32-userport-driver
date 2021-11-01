@@ -29,7 +29,7 @@ class mandel
             sem = se;
             go = xSemaphoreCreateBinary();
 
-            std::cout << *this << '\n';
+            //std::cout << *this << '\n';
         }
         ~tparam_t()
         {
@@ -51,6 +51,7 @@ class mandel
 
     /* class local variables */
     canvas_t *canvas;
+    uint16_t xres, yres;
     color_t col_pal[PAL_SIZE];
     coord_t mark_x1, mark_y1, mark_x2, mark_y2;
     myDOUBLE last_xr, last_yr, ssw, ssh, transx, transy;
@@ -138,20 +139,20 @@ class mandel
         int t = 0;
         last_xr = (tx - sx);
         last_yr = (ty - sy);
-        ssw = last_xr / IMG_W;
-        ssh = last_yr / IMG_H;
+        ssw = last_xr / xres;
+        ssh = last_yr / yres;
         transx = sx;
         transy = sy;
-        myDOUBLE stepx = (IMG_W / thread_no) * ssw;
-        myDOUBLE stepy = (IMG_H / thread_no) * ssh;
+        myDOUBLE stepx = (xres / thread_no) * ssw;
+        myDOUBLE stepy = (yres / thread_no) * ssh;
         TaskHandle_t th;
         if (thread_no > 4)
         {
             log_msg("too many threads... giving up.");
             return;
         }
-        int w = (IMG_W / thread_no);
-        int h = (IMG_H / thread_no);
+        int w = (xres / thread_no);
+        int h = (yres / thread_no);
         for (int tx = 0; tx < thread_no; tx++)
         {
             int xoffset = w * tx;
@@ -175,8 +176,8 @@ class mandel
     }
 
 public:
-    mandel(myDOUBLE xl, myDOUBLE yl, myDOUBLE xh, myDOUBLE yh, canvas_t *c)
-        : canvas(c)
+    mandel(myDOUBLE xl, myDOUBLE yl, myDOUBLE xh, myDOUBLE yh, uint16_t xr, uint16_t yr, canvas_t *c)
+        : canvas(c), xres(xr), yres(yr)
     {
         //log_msg("mandelbrot set...\n");
         for (int i = 0; i < PAL_SIZE; i++)
@@ -192,11 +193,11 @@ public:
         }
         for (int i = 0; i < NO_THREADS; i++)
             P(master_sem); // wait until all workers have finished
-        log_msg("all threads finished.\n");
+        //log_msg("all threads finished.\n");
     }
     ~mandel()
     {
-        log_msg("mandel cleaning up...\n");
+        //log_msg("mandel cleaning up...\n");
         std::for_each(worker_tasks.begin(), worker_tasks.end(),
                       [&](TaskHandle_t th) {
                           //log_msg("killing thread: %p\n", th);

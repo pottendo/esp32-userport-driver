@@ -5,12 +5,12 @@
 
 // mandelbrot set
 #define NO_THREADS 4
-#define PAL_SIZE 2
+#define PAL_SIZE 4
 #define MAX_ITER 64
 #define IMG_W 320 // 320
 #define IMG_H 200 // 200
 #define CSIZE (IMG_W * IMG_H) / 8
-#define PIXELW 1 // 2
+#define PIXELW 2 // 2
 
 typedef uint8_t canvas_t;
 typedef int coord_t;
@@ -38,17 +38,12 @@ void init_mandel(void)
 
 void cr_mandel(pp_drv *drv)
 {
-    log_msg("before freemem: %d\n", ESP.getMinFreeHeap());
-    mo = new mandel<float>(-1.5, -1.0, 0.5, 1.0, canvas);
+    mo = new mandel<float>(-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas);
     //canvas_dump(canvas);
-    delay(100);
-    log_msg("sending mandel to c64\n");
     int ret;
     if ((ret = drv->write((const char *)canvas, CSIZE)) != CSIZE)
         log_msg("mandel failed to write %d\n", ret);
-    log_msg("cleaning up\n");
     delete mo;
-    log_msg("after freemem: %d\n", ESP.getMinFreeHeap());
 }
 
 void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)

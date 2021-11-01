@@ -187,19 +187,12 @@ void do_dump(void)
 {
     log_msg("Coroutine dump for %d bytes requested\n", cr_args);
     static int ch = 0;
-    long s1, s2;
     uint8_t *buf = new uint8_t[cr_args];
     for (int i = 0; i < cr_args; i++)
     {
         buf[i] = charset_p_topetcii('a' + ((i + ch++) % 27));
     }
-    s1 = millis();
     drv->write((const char *)buf, cr_args);
-    s2 = millis();
-    log_msg("sent %d chars in ", cr_args);
-    log_msg("%dms(", s2 - s1);
-    float baud = ((float)cr_args) / (s2 - s1) * 8000;
-    log_msg("%.0fBaud)\n", baud);
     delete[] buf;
 }
 
