@@ -2,6 +2,7 @@
 #include "parport-drv.h"
 #include "misc.h"
 #include "logger.h"
+#include "co-routines.h"
 
 static pp_drv *drv;
 
@@ -20,6 +21,7 @@ void setup()
     // put your setup code here, to run once:
     Serial.begin(115200);
     setup_log();
+    init_mandel();
     delay(20);
     drv = new pp_drv;
     drv->open();
@@ -60,6 +62,11 @@ coroutine_t process_cmd(char *cmd)
             log_msg(String("Read: ") + b + " bytes");
             cr_args = b;
             return READ;
+        }
+        else if (strncmp("MAND", cmd_buf, 4) == 0)
+        {
+            cr_mandel(drv);
+            return IDLE;
         }
         strncpy(cmd_buf, cmd_buf + 1, 4);
         int ret = drv->read(cmd_buf + 4, 1);
@@ -192,7 +199,7 @@ void do_dump(void)
     log_msg("sent %d chars in ", cr_args);
     log_msg("%dms(", s2 - s1);
     float baud = ((float)cr_args) / (s2 - s1) * 8000;
-    log_msg("%.0f)\n", baud);
+    log_msg("%.0fBaud)\n", baud);
     delete[] buf;
 }
 
@@ -263,7 +270,15 @@ void loop()
         }
     }
     else
-        log_msg("read error: %d\n", ret);
+    {
+        static int retry = 0;
+        log_msg("read error(%d'th time): %d\n", ++retry, ret);
+        if (retry > 10)
+        {
+            log_msg("...giving up & rebooting\n");
+            ESP.restart();
+        }
+    }
     //delete line;
     loop_log();
     delay(100);

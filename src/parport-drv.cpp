@@ -114,7 +114,7 @@ void pp_drv::pc2_isr(void)
                 {
                     if ((micros() - to) > 250)
                     {
-                        log_msg_isr("TC2 handshake1 - C64 not responding.\n");
+                        //log_msg_isr("TC2 handshake1 - C64 not responding.\n");
                         err = -1;
                         break;
                     }
@@ -126,7 +126,7 @@ void pp_drv::pc2_isr(void)
         {
             //log_msg_isr("last char sent, releasing mutex\n");
             if (xQueueSendToBackFromISR(s1_queue, &err, &higherPriorityTaskWoken) == errQUEUE_FULL)
-                log_msg_isr("TC2 can't release write.\n");
+                ; //log_msg_isr("TC2 can't release write.\n");
         }
         if (!err)
         {
@@ -135,8 +135,8 @@ void pp_drv::pc2_isr(void)
             {
                 if ((micros() - to) > 250)
                 {
-                    log_msg_isr("TC2 handshake2 - C64 not responding.\n");
-                    err = true;
+                    //log_msg_isr("TC2 handshake2 - C64 not responding.\n");
+                    err = -2;
                     break;
                 }
             }
@@ -281,8 +281,10 @@ int pp_drv::read(char *buf, int len, bool block)
 {
     int count = 0;
     char c;
-    while (len && ring_buf.get(c, block))
-    {
+    while (len)
+    { 
+        if (!ring_buf.get(c, block))
+            return -1;
         buf[count++] = c;
         len--;
     }
