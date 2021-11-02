@@ -3,7 +3,22 @@
 #include "parport-drv.h"
 #include "co-routines.h"
 
-// mandelbrot set
+std::list<cr_base *> cr_base::coroutines;
+
+void setup_cr(void)
+{
+    cr_mandel_t *mb = new cr_mandel_t{"MAND"};  // never freed
+}
+
+void loop_cr(void)
+{}
+
+
+// Couroutines
+
+
+// Calculate & render mandelbrot set into an array layouted for C64 hires gfx
+
 #define NO_THREADS 4
 #define PAL_SIZE 4
 #define MAX_ITER 64
@@ -11,6 +26,15 @@
 #define IMG_H 200 // 200
 #define CSIZE (IMG_W * IMG_H) / 8
 #define PIXELW 2 // 2
+
+
+bool cr_mandel_t::setup()
+{
+    canvas = new uint8_t[CSIZE];
+    memset(canvas, 0x0, CSIZE);
+
+    return true;
+}
 
 typedef uint8_t canvas_t;
 typedef int coord_t;
@@ -23,27 +47,21 @@ typedef struct
 
 void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c);
 static void canvas_dump(canvas_t *c);
+uint8_t *canvas;
 
 #include "mandelbrot.h"
 
-mandel<float> *mo;
-
-uint8_t *canvas;
-
-void init_mandel(void)
+bool cr_mandel_t::run(pp_drv *drv)
 {
-    canvas = new uint8_t[CSIZE];
-    memset(canvas, 0x0, CSIZE);
-}
-
-void cr_mandel(pp_drv *drv)
-{
-    mo = new mandel<float>(-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas);
+    mandel<float> m{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
     //canvas_dump(canvas);
     int ret;
     if ((ret = drv->write((const char *)canvas, CSIZE)) != CSIZE)
+    {
         log_msg("mandel failed to write %d\n", ret);
-    delete mo;
+        return false;
+    }
+    return true;
 }
 
 void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)

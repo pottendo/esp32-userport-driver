@@ -21,7 +21,7 @@ void setup()
     // put your setup code here, to run once:
     Serial.begin(115200);
     setup_log();
-    init_mandel();
+    setup_cr();
     delay(20);
     drv = new pp_drv;
     drv->open();
@@ -36,6 +36,11 @@ coroutine_t process_cmd(char *cmd)
     static char aux_buf[MAX_AUX];
     while (*cmd_buf)
     {
+        for (auto cr : cr_base::coroutines)
+        {
+            if (cr->match(cmd_buf, drv))
+                return IDLE;
+        }
         if (strncmp("ECHO", cmd_buf, 4) == 0)
         {
             cr_argsstr = aux_buf;
@@ -65,7 +70,7 @@ coroutine_t process_cmd(char *cmd)
         }
         else if (strncmp("MAND", cmd_buf, 4) == 0)
         {
-            cr_mandel(drv);
+            
             return IDLE;
         }
         strncpy(cmd_buf, cmd_buf + 1, 4);
