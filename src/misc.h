@@ -82,4 +82,5 @@ public:
     }
 };
 
+uint8_t charset_p_topetcii(uint8_t c);
 #endif

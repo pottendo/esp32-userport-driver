@@ -6,16 +6,6 @@
 
 static pp_drv *drv;
 
-typedef enum
-{
-    IDLE,
-    ECHO,
-    DUMP,
-    READ
-} coroutine_t;
-int cr_args = 0;
-const char *cr_argsstr;
-
 void setup()
 {
     // put your setup code here, to run once:
@@ -30,61 +20,28 @@ void setup()
     //drv.setup_sender();
 }
 
-coroutine_t process_cmd(char *cmd)
+int process_cmd(char *cmd)
 {
     char *cmd_buf = cmd;
-    static char aux_buf[MAX_AUX];
     while (*cmd_buf)
     {
         for (auto cr : cr_base::coroutines)
         {
             if (cr->match(cmd_buf, drv))
-                return IDLE;
+                return 1;
         }
-        if (strncmp("ECHO", cmd_buf, 4) == 0)
-        {
-            cr_argsstr = aux_buf;
-            char c;
-            int idx = 0;
-            while (drv->read(&c, 1))
-            {
-                aux_buf[idx++] = c;
-                if (c == '\0')
-                    break;
-            }
-            return ECHO;
-        }
-        else if (strncmp("DUMP", cmd_buf, 4) == 0)
-        {
-            drv->read(aux_buf, 2);
-            int b = aux_buf[0] + aux_buf[1] * 256;
-            cr_args = b;
-            return DUMP;
-        }
-        else if (strncmp("READ", cmd_buf, 4) == 0)
-        {
-            int b = cmd_buf[4] + cmd_buf[5] * 256;
-            log_msg(String("Read: ") + b + " bytes");
-            cr_args = b;
-            return READ;
-        }
-        else if (strncmp("MAND", cmd_buf, 4) == 0)
-        {
-            
-            return IDLE;
-        }
-        strncpy(cmd_buf, cmd_buf + 1, 4);
+        strncpy(cmd_buf, cmd_buf + 1, 3);
         int ret = drv->read(cmd_buf + 4, 1);
         if (ret != 1)
         {
             log_msg("process_cmd, read error: %d\n", ret);
             break;
         }
-        cmd_buf[5] = '\0';
+        cmd_buf[5] = '\0';  // probably not needed.
     }
     log_msg("Unknown command: %s\n", cmd);
 
-    return IDLE;
+    return 0;
 }
 
 static uint8_t petcii_fix_dupes(uint8_t c)
@@ -188,83 +145,18 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
     return ((isprint(c) ? c : ASCII_UNMAPPED));
 }
 
-void do_dump(void)
-{
-    log_msg("Coroutine dump for %d bytes requested\n", cr_args);
-    static int ch = 0;
-    uint8_t *buf = new uint8_t[cr_args];
-    for (int i = 0; i < cr_args; i++)
-    {
-        buf[i] = charset_p_topetcii('a' + ((i + ch++) % 27));
-    }
-    drv->write((const char *)buf, cr_args);
-    delete[] buf;
-}
-
-void do_echo(const char *what)
-{
-    log_msg("Coroutine echo requested '%s'\n", what);
-    if (!cr_argsstr)
-    {
-        log_msg("nothing to echo\n");
-        return;
-    }
-    drv->write(what, strlen(what));
-}
-
-void do_read(void)
-{
-    log_msg("Coroutine read requested\n");
-    long sent = 0;
-    while (sent < cr_args)
-    {
-        if (Serial.available())
-        {
-            char c = Serial.read();
-            char cpet = charset_p_topetcii(c);
-            drv->write(&cpet, 1);
-            sent++;
-        }
-        delay(100);
-    }
-}
-
 void loop()
 {
-    coroutine_t cr = IDLE;
-
     log_msg("Waiting for command from c64...\n");
-#if 0
-    drv->readstr(&line);
-    log_msg(String("C64 sent: '") + (*line) + "'\n");
-    cr = process_cmd(line->c_str());
-#endif
+
     static char buf[MAX_AUX];
     int ret = drv->read(buf, 4);
     if (ret == 4)
     {
         buf[ret] = '\0';
-        cr = process_cmd(buf);
-        switch (cr)
+        if (!process_cmd(buf))
         {
-        case IDLE:
-            break;
-        case ECHO:
-            do_echo(cr_argsstr);
-            cr_argsstr = nullptr;
-            cr = IDLE;
-            break;
-        case DUMP:
-            cr = IDLE;
-            do_dump();
-            break;
-        case READ:
-            cr = IDLE;
-            do_read();
-            break;
-        default:
-            log_msg("Unknown CoRoutine... %d", cr);
-            break;
+            log_msg("Unknown CoRoutine... %s\n", buf);
         }
     }
     else
@@ -276,8 +168,8 @@ void loop()
             log_msg("...giving up & rebooting\n");
             ESP.restart();
         }
+        delay(500);
     }
-    //delete line;
     loop_log();
     delay(100);
 }

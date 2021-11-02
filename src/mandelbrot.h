@@ -57,7 +57,7 @@ class mandel
     myDOUBLE last_xr, last_yr, ssw, ssh, transx, transy;
 
     SemaphoreHandle_t master_sem, canvas_sem;
-    std::list<TaskHandle_t> worker_tasks;
+    TaskHandle_t worker_tasks[NO_THREADS];
 
     /* class private functinos */
     // abs() would calc sqr() as well, we don't need that for this fractal
@@ -153,6 +153,7 @@ class mandel
         }
         int w = (xres / thread_no);
         int h = (yres / thread_no);
+
         for (int tx = 0; tx < thread_no; tx++)
         {
             int xoffset = w * tx;
@@ -169,9 +170,31 @@ class mandel
                                      master_sem, this);
                 //th = SDL_CreateThread(mandel_wrapper, "T", tp[t]);
                 xTaskCreate(mandel_wrapper, "mandel", 4096, tp[t], uxTaskPriorityGet(nullptr), &th);
-                worker_tasks.push_back(th);
+                worker_tasks[t] = th;
                 t++;
             }
+        }
+    }
+
+    void go(void)
+    {
+        for (int i = 0; i < NO_THREADS; i++)
+        {
+            V(tp[i]->go);
+            //usleep(250 * 1000);
+        }
+        for (int i = 0; i < NO_THREADS; i++)
+            P(master_sem); // wait until all workers have finished
+        //log_msg("all threads finished.\n");
+    }
+
+    void free_ressources(void)
+    {
+        //log_msg("mandel cleaning up...\n");
+        for (int i = 0; i < NO_THREADS; i++)
+        {
+            vTaskDelete(worker_tasks[i]);
+            delete tp[i];
         }
     }
 
@@ -182,29 +205,14 @@ public:
         //log_msg("mandelbrot set...\n");
         for (int i = 0; i < PAL_SIZE; i++)
             col_pal[i] = i;
-
         canvas_sem = xSemaphoreCreateMutex();
         master_sem = xSemaphoreCreateCounting(NO_THREADS, 0);
         mandel_setup(sqrt(NO_THREADS), xl, yl, xh, yh);
-        for (int i = 0; i < NO_THREADS; i++)
-        {
-            V(tp[i]->go);
-            //usleep(250 * 1000);
-        }
-        for (int i = 0; i < NO_THREADS; i++)
-            P(master_sem); // wait until all workers have finished
-        //log_msg("all threads finished.\n");
+        go();
     }
     ~mandel()
     {
-        //log_msg("mandel cleaning up...\n");
-        std::for_each(worker_tasks.begin(), worker_tasks.end(),
-                      [&](TaskHandle_t th) {
-                          //log_msg("killing thread: %p\n", th);
-                          vTaskDelete(th);
-                      });
-        for (int i = 0; i < NO_THREADS; i++)
-            delete tp[i];
+        free_ressources();
         vSemaphoreDelete(master_sem);
         vSemaphoreDelete(canvas_sem);
     };
@@ -229,33 +237,24 @@ public:
         if (mark_y2 < 0)
             mark_y2 = 0;
         log_msg("rect coord: %dx%d - %dx%d\n", mark_x1, mark_y1, mark_x2, mark_y2);
-
+        free_ressources();
         mandel_setup(sqrt(NO_THREADS),
                      mark_x1 * ssw + transx,
                      mark_y1 * ssh + transy,
                      mark_x2 * ssw + transx,
                      mark_y2 * ssh + transy);
-#if 0                
-        if (rect)
-            lv_obj_del(rect);
-        rect = nullptr;
-#endif
+        go();
+
         mark_x1 = -1;
         mark_x2 = mark_x1;
         mark_y2 = mark_y1;
     }
 
+#if 0
     void select_update(point_t &p)
     {
         if (mark_x1 < 0)
-        {
-#if 0
-            if (rect)
-                lv_obj_del(rect);
-            rect = nullptr;
-#endif
             return;
-        }
         coord_t tx = mark_x2;
         coord_t ty = mark_y2;
         mark_x2 = p.x; // - ((LV_HOR_RES_MAX - IMG_W) / 2);
@@ -266,25 +265,9 @@ public:
             mark_y2 = 0;
         if ((tx == mark_x2) && (ty == mark_y2))
             return;
-#if 0
-        if (rect)
-        {
-            lv_obj_del(rect);
-        }
-        rect = lv_line_create(lv_scr_act(), nullptr);
-        pts[0] = {mark_x1, mark_y1};
-        pts[1] = {mark_x2, mark_y1};
-        pts[2] = {mark_x2, mark_y2};
-        pts[3] = {mark_x1, mark_y2};
-        pts[4] = {mark_x1, mark_y1};
-        lv_line_set_points(rect, pts, 5);
-        lv_obj_add_style(rect, LV_LINE_PART_MAIN, &style_line);
-        lv_obj_set_top(rect, true);
-        lv_obj_align(rect, canvas, LV_ALIGN_IN_TOP_LEFT, 0, 0);
-#endif
-
         //log_msg("rect coord: %dx%d - %dx%d\n", mark_x1, mark_y1, mark_x2, mark_y2);
     }
+#endif
 };
 
 #endif

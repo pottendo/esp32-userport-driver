@@ -4,10 +4,14 @@
 #include "co-routines.h"
 
 std::list<cr_base *> cr_base::coroutines;
+char cr_base::aux_buf[MAX_AUX];
 
 void setup_cr(void)
 {
-    cr_mandel_t *mb = new cr_mandel_t{"MAND"};  // never freed
+    new cr_mandel_t{"MAND"};  // never freed
+    new cr_echo_t{"ECHO"};
+    new cr_dump_t{"DUMP"};
+    new cr_read_t{"READ"};
 }
 
 void loop_cr(void)
@@ -55,7 +59,11 @@ bool cr_mandel_t::run(pp_drv *drv)
 {
     mandel<float> m{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
     //canvas_dump(canvas);
+    memset(canvas, 0x0, CSIZE);
     int ret;
+    point_t ps{0,0}, pe{(IMG_W/PIXELW)/2, IMG_H/2 };
+    m.select_start(ps);
+    m.select_end(pe);
     if ((ret = drv->write((const char *)canvas, CSIZE)) != CSIZE)
     {
         log_msg("mandel failed to write %d\n", ret);

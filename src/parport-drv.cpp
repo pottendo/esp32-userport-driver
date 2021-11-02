@@ -189,7 +189,7 @@ pp_drv::~pp_drv()
 void pp_drv::drv_body(void)
 {
     char c;
-    log_msg("driver launched at priority %d\n", uxTaskPriorityGet(nullptr));
+    log_msg("driver(reader) launched at priority %d\n", uxTaskPriorityGet(nullptr));
 
     while (true)
     {
@@ -203,7 +203,7 @@ void pp_drv::drv_body(void)
 
 void pp_drv::drv_ackrcv(void)
 {
-    log_msg("drv rcv task launched with priority %d\n", uxTaskPriorityGet(nullptr));
+    log_msg("diver(wsync) launched with priority %d\n", uxTaskPriorityGet(nullptr));
     while (true)
     {
         //P(isr_mutex);
