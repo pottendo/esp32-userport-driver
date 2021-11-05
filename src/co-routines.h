@@ -47,7 +47,7 @@ public:
 class cr_mandel_t : public cr_base
 {
     uint8_t *canvas;
-
+    void *m;
 public:
     cr_mandel_t(const char *n) : cr_base(String{n}) { reg(); }
     ~cr_mandel_t() = default;

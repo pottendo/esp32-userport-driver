@@ -25,20 +25,12 @@ void loop_cr(void)
 
 #define NO_THREADS 4
 #define PAL_SIZE 4
-#define MAX_ITER 64
+#define MAX_ITER 128
 #define IMG_W 320 // 320
 #define IMG_H 200 // 200
 #define CSIZE (IMG_W * IMG_H) / 8
 #define PIXELW 2 // 2
 
-
-bool cr_mandel_t::setup()
-{
-    canvas = new uint8_t[CSIZE];
-    memset(canvas, 0x0, CSIZE);
-
-    return true;
-}
 
 typedef uint8_t canvas_t;
 typedef int coord_t;
@@ -54,16 +46,33 @@ static void canvas_dump(canvas_t *c);
 uint8_t *canvas;
 
 #include "mandelbrot.h"
+bool cr_mandel_t::setup()
+{
+    canvas = new uint8_t[CSIZE];
+    memset(canvas, 0x0, CSIZE);
+    m = (void *) new mandel<float>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
+
+    return true;
+}
 
 bool cr_mandel_t::run(pp_drv *drv)
 {
-    mandel<float> m{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
+    int ret;
+    ret = drv->read(aux_buf, 6);
+    if (ret != 6)
+    {
+        log_msg("mandel parm incomplete: %d\n", ret);
+        return false;
+    }
+    point_t ps{aux_buf[0] + aux_buf[1]*256, aux_buf[2]};
+    point_t pe{aux_buf[3] + aux_buf[4]*256, aux_buf[5]};
+    ps.x /= 2;
+    pe.x /= 2;    
+    log_msg("mandel screen: {%d,%d} x {%d,%d}\n", ps.x, ps.y, pe.x, pe.y);
     //canvas_dump(canvas);
     memset(canvas, 0x0, CSIZE);
-    int ret;
-    point_t ps{0,0}, pe{(IMG_W/PIXELW)/2, IMG_H/2 };
-    m.select_start(ps);
-    m.select_end(pe);
+    ((mandel<float> *)m)->select_start(ps);
+    ((mandel<float> *)m)->select_end(pe);
     if ((ret = drv->write((const char *)canvas, CSIZE)) != CSIZE)
     {
         log_msg("mandel failed to write %d\n", ret);

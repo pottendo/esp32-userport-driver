@@ -148,7 +148,7 @@ class mandel
         TaskHandle_t th;
         if (thread_no > 4)
         {
-            log_msg("too many threads... giving up.");
+            log_msg("too many threads... giving up.\n");
             return;
         }
         int w = (xres / thread_no);
@@ -207,8 +207,8 @@ public:
             col_pal[i] = i;
         canvas_sem = xSemaphoreCreateMutex();
         master_sem = xSemaphoreCreateCounting(NO_THREADS, 0);
-        mandel_setup(sqrt(NO_THREADS), xl, yl, xh, yh);
-        go();
+        mandel_setup(100, xl, yl, xh, yh); // initialize some stuff, but don't calculate
+        //go();
     }
     ~mandel()
     {
@@ -237,7 +237,6 @@ public:
         if (mark_y2 < 0)
             mark_y2 = 0;
         log_msg("rect coord: %dx%d - %dx%d\n", mark_x1, mark_y1, mark_x2, mark_y2);
-        free_ressources();
         mandel_setup(sqrt(NO_THREADS),
                      mark_x1 * ssw + transx,
                      mark_y1 * ssh + transy,
