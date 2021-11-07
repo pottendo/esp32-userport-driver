@@ -15,9 +15,9 @@ void udelay(unsigned long us)
  * static members
  */
 pp_drv *pp_drv::active_drv = nullptr;
-void IRAM_ATTR pp_drv::isr_wrapper_pa2(void)
+void IRAM_ATTR pp_drv::isr_wrapper_sp2(void)
 {
-    active_drv->pa2_isr();
+    active_drv->sp2_isr();
 }
 
 void IRAM_ATTR pp_drv::isr_wrapper_pc2(void)
@@ -38,26 +38,20 @@ void pp_drv::th_wrapper2(void *t)
 }
 
 /* ISRs */
-void pp_drv::pa2_isr(void)
+void pp_drv::sp2_isr(void)
 {
-    return;
-
-    // PA2 signaled by C64, LOW: ESP->C64, HIGH: C64->ESP
-    if (digitalRead(PA2) == LOW)
+    // SP2 signaled by C64:
+    //   LOW: C64 -> ESP
+    //   HIGH: ESP -> C64 possible
+    if (digitalRead(SP2) == LOW)
     {
-        //mode = OUTPUT;
         digitalWrite(LED_BUILTIN, LOW);
-        log_msg_isr("pa2(LOW) isr - mode ESP->C64\n");
+        log_msg_isr("SP2(LOW) isr - mode C64 -> ESP\n");
     }
     else
     {
-        //mode = INPUT;
         digitalWrite(LED_BUILTIN, HIGH);
-        log_msg_isr("pa2(HIGH) isr - mode C64->ESP\n");
-    }
-    for (uint8_t i = _PB0; i <= _PB7; i++)
-    {
-        pinMode(PAR(i), mode);
+        log_msg_isr("SP2(HIGH) isr - mode ESP->C64\n");
     }
 }
 
@@ -75,12 +69,14 @@ static volatile bool not_ready = false;
 /* ISRs */
 void pp_drv::pc2_isr(void)
 {
+    int8_t err = 0;
     BaseType_t higherPriorityTaskWoken = pdFALSE;
     if (mode == INPUT)
     {
         char c;
         int i;
         c = 0;
+
         for (i = _PB7; i >= _PB0; i--)
         {
             char b = (digitalRead(PAR(i)) == LOW) ? 0 : 1;
@@ -90,25 +86,35 @@ void pp_drv::pc2_isr(void)
         if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
             blink(150, 0); // signal that we've just discarded a char
         flag_handshake();
+        unsigned long to = micros();
+        while (digitalRead(PA2) != HIGH)
+        {
+            if ((micros() - to) > 250)
+            {
+                //log_msg_isr("TC2 handshake1 - C64 not responding.\n");
+                err = -1;
+                blink(150, 0);
+                break;
+            }
+        }
+
         if (higherPriorityTaskWoken)
             portYIELD_FROM_ISR();
     }
     if (mode == OUTPUT)
     {
         //log_msg_isr("pc2 isr - output\n");
-        int8_t err = 0;
         BaseType_t xTaskWokenByReceive = pdFALSE;
         char c;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
-            if (xQueueReceiveFromISR(tx_queue,
-                                     (void *)&c,
-                                     &xTaskWokenByReceive) == pdTRUE)
+            if ((digitalRead(SP2) == HIGH) &&
+                (xQueueReceiveFromISR(tx_queue, (void *)&c,
+                                      &xTaskWokenByReceive) == pdTRUE))
             {
                 //log_msg_isr("would send from ISR" + c + '\n');
                 outchar(c);
                 flag_handshake();
-                //udelay(50);
                 unsigned long to = micros();
                 while (digitalRead(PA2) != HIGH)
                 {
@@ -244,10 +250,11 @@ void pp_drv::open(void)
     ///blink(100, 3);
     pinMode(PA2, INPUT);
     pinMode(PC2, INPUT_PULLDOWN);
+    pinMode(SP2, INPUT);
     pinMode(FLAG, OUTPUT);
     digitalWrite(FLAG, HIGH);
     mode = INPUT;
-    //attachInterrupt(digitalPinToInterrupt(PA2), isr_wrapper_pa2, CHANGE);
+    //attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, HIGH);
 
     setup_rcv();
@@ -256,7 +263,7 @@ void pp_drv::open(void)
 void pp_drv::close(void)
 {
     blink(500, 2);
-    //detachInterrupt(digitalPinToInterrupt(PA2));
+    //detachInterrupt(digitalPinToInterrupt(SP2));
     detachInterrupt(digitalPinToInterrupt(PC2));
 }
 
@@ -293,7 +300,7 @@ int pp_drv::read(char *buf, int len, bool block)
 
 void pp_drv::outchar(const char ct) // also called from ISR context!
 {
-    for (uint8_t s = _PB0; s <= _PB7; s++)
+    for (uint8_t s = _PB0; (digitalRead(SP2) == HIGH) && (s <= _PB7); s++)
     {
         uint8_t bit = (ct & (1 << s)) ? HIGH : LOW;
         digitalWrite(PAR(s), bit);
@@ -332,7 +339,7 @@ int pp_drv::write(const char *str, int len)
         if (err != 0)
         {
             log_msg("write error: %d\n", err);
-            ret = -1; 
+            ret = -1;
             goto out;
         }
     }

@@ -28,9 +28,10 @@ class pp_drv
         _PB7,
         _PA2,
         _PC2,
+        _SP2,
         _FLAG
     } par_pins_t;
-    const uint8_t par_pins[11] = {13, 4, 16, 17, 5, 18, 19, 22, 23, 21, 15};
+    const uint8_t par_pins[12] = {13, 4, 16, 17, 5, 18, 19, 22, 23, 21, 27, 15};
     QueueHandle_t rx_queue;
     QueueHandle_t tx_queue;
     QueueHandle_t s1_queue;
@@ -52,16 +53,17 @@ class pp_drv
 #define PB7 PAR(_PB7)
 #define PA2 PAR(_PA2)
 #define PC2 PAR(_PC2)
+#define SP2 PAR(_SP2)
 #define FLAG PAR(_FLAG)
 
 protected:
     static void th_wrapper1(void *t);
     static void th_wrapper2(void *t);
-    static void isr_wrapper_pa2(void);
+    static void isr_wrapper_sp2(void);
     static void isr_wrapper_pc2(void);
     static pp_drv *active_drv;
 
-    void pa2_isr(void);
+    void sp2_isr(void);
     void pc2_isr(void);
     void drv_ackrcv(void);
     void outchar(const char c);
@@ -80,8 +82,7 @@ public:
     void setup_snd(void);
     void open(void);
     void close(void);
-    void detach_isr(void) { detachInterrupt(digitalPinToInterrupt(PA2)); }
-
+    
     int readstr(String **s);
     int writestr(String &s) { return write(s.c_str(), s.length()); }
     int write(const char *s, int len);

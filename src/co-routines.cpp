@@ -50,7 +50,7 @@ bool cr_mandel_t::setup()
 {
     canvas = new uint8_t[CSIZE];
     memset(canvas, 0x0, CSIZE);
-    m = (void *) new mandel<float>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
+    m = (void *) new mandel<double>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
 
     return true;
 }
@@ -71,8 +71,8 @@ bool cr_mandel_t::run(pp_drv *drv)
     log_msg("mandel screen: {%d,%d} x {%d,%d}\n", ps.x, ps.y, pe.x, pe.y);
     //canvas_dump(canvas);
     memset(canvas, 0x0, CSIZE);
-    ((mandel<float> *)m)->select_start(ps);
-    ((mandel<float> *)m)->select_end(pe);
+    ((mandel<double> *)m)->select_start(ps);
+    ((mandel<double> *)m)->select_end(pe);
     if ((ret = drv->write((const char *)canvas, CSIZE)) != CSIZE)
     {
         log_msg("mandel failed to write %d\n", ret);
