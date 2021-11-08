@@ -89,15 +89,15 @@ void pp_drv::pc2_isr(void)
         unsigned long to = micros();
         while (digitalRead(PA2) != HIGH)
         {
-            if ((micros() - to) > 250)
+            if ((micros() - to) > 500)
             {
                 //log_msg_isr("TC2 handshake1 - C64 not responding.\n");
                 err = -1;
                 blink(150, 0);
-                break;
+                flag_handshake();
             }
         }
-
+        //blink(150, 0);
         if (higherPriorityTaskWoken)
             portYIELD_FROM_ISR();
     }
@@ -347,7 +347,7 @@ int pp_drv::write(const char *str, int len)
     log_msg("sent %d chars in ", ret);
     log_msg("%dms(", t2 - t1);
     baud = ((float)ret) / (t2 - t1) * 8000;
-    log_msg("%.0fBaud)\n", baud);
+    log_msg("%.0f BAUD)\n", baud);
 out:
     setup_rcv();
     return ret;

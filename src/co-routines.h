@@ -7,6 +7,8 @@
 void setup_cr(void);
 void loop_cr(void);
 
+int cmp(uint8_t *buf, int len);
+
 class cr_base
 {
 protected:
@@ -46,7 +48,7 @@ public:
 
 class cr_mandel_t : public cr_base
 {
-    uint8_t *canvas;
+    //uint8_t *canvas;
     void *m;
 public:
     cr_mandel_t(const char *n) : cr_base(String{n}) { reg(); }
@@ -124,6 +126,47 @@ public:
         return true;
     }
 };
+
+class cr_dump2_t : public cr_base
+{
+    uint8_t *canvas;
+
+public:
+    cr_dump2_t(const char *n) : cr_base(String{n}) { reg(); }
+    ~cr_dump2_t() = default;
+
+    bool setup(void) override { return true; };
+    bool run(pp_drv *drv) override
+    {
+        char *buf = new char[MAX_AUX];
+        int ret;
+        if ((ret = drv->read(aux_buf, 2)) != 2)
+        {
+            log_msg("read error: %d\n", ret);
+            return false;
+        }
+        int b = aux_buf[0] + aux_buf[1] * 256;
+
+        if (b >= MAX_AUX)
+        {
+            log_msg("dump too large: %d.\n", b);
+            return false;
+        }
+        unsigned long t1 = millis(), t2;
+        if ((ret = drv->read(buf, b)) != b)
+        {
+            log_msg("read error: %d\n", ret);
+            return false;
+        }
+        t2 = millis();
+        float baud = ((float)ret) / (t2 - t1) * 8000;
+        int equal = cmp((uint8_t *)buf, ret);
+        log_msg("successfully read %d bytes in %ldms(%.0f BAUD) - ident = %d.\n", ret, millis() - t1, baud, equal);
+        delete[] buf;
+        return true;
+    }
+};
+
 
 class cr_read_t : public cr_base
 {

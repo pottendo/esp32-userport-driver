@@ -54,7 +54,7 @@ public:
     ring_buf_t(int sz) : size(sz), w(0), r(0), unblock(false)
     {
         buffer = new T[sz];
-        wmutex = xSemaphoreCreateCounting(sz, sz);
+        wmutex = xSemaphoreCreateCounting(sz, sz - 1);
         rmutex = xSemaphoreCreateCounting(sz, 0);
     }
     ~ring_buf_t() { delete[] buffer; }
@@ -62,8 +62,8 @@ public:
     inline void put(T &item)
     {
         P(wmutex);
-        buffer[w] = item;
         w++; w %= size;
+        buffer[w] = item;
         V(rmutex);
     }
     inline bool get(T &item, bool block = true)
@@ -74,9 +74,8 @@ public:
             log_msg("ringbuffer corrupt r:%d, w:%d\n", r, w);
             return false;
         }
-
-        item = buffer[r];
         r++; r %= size;
+        item = buffer[r];
         V(wmutex);
         return true;
     }

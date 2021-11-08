@@ -6,7 +6,7 @@
 #include "misc.h"
 #include "logger.h"
 
-#define MAX_AUX (1024 * 16)
+#define MAX_AUX (1024 * 8)
 
 extern void udelay(unsigned long us);
 

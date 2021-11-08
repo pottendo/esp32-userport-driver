@@ -39,7 +39,7 @@ int process_cmd(char *cmd)
         }
         cmd_buf[5] = '\0';  // probably not needed.
     }
-    log_msg("Unknown command: %s\n", cmd);
+    log_msg("Unknown command: '%s'\n", cmd);
 
     return 0;
 }

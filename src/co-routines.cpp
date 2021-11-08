@@ -10,8 +10,9 @@ void setup_cr(void)
 {
     new cr_mandel_t{"MAND"};  // never freed
     new cr_echo_t{"ECHO"};
-    new cr_dump_t{"DUMP"};
+    new cr_dump_t{"DUM1"};
     new cr_read_t{"READ"};
+    new cr_dump2_t{"DUM2"};
 }
 
 void loop_cr(void)
@@ -43,7 +44,7 @@ typedef struct
 
 void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c);
 static void canvas_dump(canvas_t *c);
-uint8_t *canvas;
+static uint8_t *canvas;
 
 #include "mandelbrot.h"
 bool cr_mandel_t::setup()
@@ -51,7 +52,6 @@ bool cr_mandel_t::setup()
     canvas = new uint8_t[CSIZE];
     memset(canvas, 0x0, CSIZE);
     m = (void *) new mandel<double>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
-
     return true;
 }
 
@@ -68,7 +68,7 @@ bool cr_mandel_t::run(pp_drv *drv)
     point_t pe{aux_buf[3] + aux_buf[4]*256, aux_buf[5]};
     ps.x /= 2;
     pe.x /= 2;    
-    log_msg("mandel screen: {%d,%d} x {%d,%d}\n", ps.x, ps.y, pe.x, pe.y);
+    log_msg("mandel screen: {%d,%d} x {%d,%d}, canvas=%p\n", ps.x, ps.y, pe.x, pe.y, canvas);
     //canvas_dump(canvas);
     memset(canvas, 0x0, CSIZE);
     ((mandel<double> *)m)->select_start(ps);
@@ -79,6 +79,12 @@ bool cr_mandel_t::run(pp_drv *drv)
         return false;
     }
     return true;
+}
+
+int cmp(uint8_t *s, int len)
+{
+    //log_msg("compare requested with %d bytes buf=%p, canvas=%p.\n", len, s, canvas);
+    return memcmp(canvas, s, len);
 }
 
 void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)
@@ -102,6 +108,7 @@ void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)
     t %= ~val;
     t |= val;
     canvas[cidx] = t;
+    vTaskDelay(0 / portTICK_RATE_MS);
 }
 
 static void dump_bits(uint8_t c)
