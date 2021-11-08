@@ -31,13 +31,13 @@ int process_cmd(char *cmd)
                 return 1;
         }
         strncpy(cmd_buf, cmd_buf + 1, 3);
-        int ret = drv->read(cmd_buf + 4, 1);
+        int ret = drv->read(cmd_buf + 3, 1);
         if (ret != 1)
         {
             log_msg("process_cmd, read error: %d\n", ret);
             break;
         }
-        cmd_buf[5] = '\0';  // probably not needed.
+        cmd_buf[4] = '\0';  // probably not needed.
     }
     log_msg("Unknown command: '%s'\n", cmd);
 
