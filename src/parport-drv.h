@@ -15,6 +15,7 @@ class pp_drv
     uint16_t qs, bs;
     SemaphoreHandle_t mutex, out_mutex, isr_mutex, read_mutex;
     TaskHandle_t th;
+    bool verbose;
     // enum to enable iteration over all pins
     typedef enum
     {
@@ -39,8 +40,8 @@ class pp_drv
 
     std::list<String *> rqueue;
     uint8_t mode;
-
-    ring_buf_t<char> ring_buf{256};
+    const int rbuf_len = 256;
+    ring_buf_t<char> ring_buf{rbuf_len};
 
 #define PAR(x) (par_pins[x])
 #define PB0 PAR(_PB0)
@@ -82,11 +83,41 @@ public:
     void setup_snd(void);
     void open(void);
     void close(void);
-    
+
     int readstr(String **s);
     int writestr(String &s) { return write(s.c_str(), s.length()); }
     int write(const char *s, int len);
     int read(char *buf, int len, bool block = true);
+
+    /* virtual functions from stream */
+    virtual size_t write(uint8_t c) { return write((const char *)(&c), 1); }
+    virtual int available(void) { return ring_buf.len(); }
+    virtual int read(void)
+    {
+        char c;
+        int ret = read(&c, 1);
+        return ((ret == 1) ? c : -1);
+    }
+    virtual int peek(void) { return ring_buf.peek(); }
+    virtual void flush(void) {}
+    void setTimeout(int) {}
+    int readBytes(uint8_t *buf, size_t len) { return read((char *)buf, len); }
+    /* functions from HWSerial */
+    int availableForWrite(void) { return rbuf_len - ring_buf.len(); }
+    void changeBaudRate(int) {}
+    void changeConfig(uint32_t) {}
+    void begin(unsigned long baud, uint32_t config) {}
+
+    void printf(const char *s, ...)
+    {
+        char t[256];
+        va_list args;
+        va_start(args, s);
+        vsnprintf(t, 256, s, args);
+        write(t, strlen(t));
+    }   
 };
+
+extern pp_drv drv;
 
 #endif

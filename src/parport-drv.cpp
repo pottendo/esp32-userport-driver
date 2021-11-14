@@ -93,7 +93,7 @@ void pp_drv::pc2_isr(void)
             {
                 //log_msg_isr("TC2 handshake1 - C64 not responding.\n");
                 err = -1;
-                blink(150, 0);
+                //blink(150, 0);
                 flag_handshake();
             }
         }
@@ -168,7 +168,7 @@ void pp_drv::pc2_isr(void)
  * member functions
  */
 pp_drv::pp_drv(uint16_t qs, uint16_t bs)
-    : qs(qs), bs(bs)
+    : qs(qs), bs(bs), verbose(false)
 {
     mutex = xSemaphoreCreateBinary();
     V(mutex);
@@ -179,8 +179,6 @@ pp_drv::pp_drv(uint16_t qs, uint16_t bs)
     s1_queue = xQueueCreate(1, sizeof(int8_t));
     s2_queue = xQueueCreate(1, sizeof(int8_t));
 
-    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th);
-    xTaskCreate(th_wrapper2, "pp-drv-snd", 2000, this, uxTaskPriorityGet(nullptr) + 1, &th);
 }
 
 pp_drv::~pp_drv()
@@ -195,7 +193,7 @@ pp_drv::~pp_drv()
 void pp_drv::drv_body(void)
 {
     char c;
-    log_msg("driver(reader) launched at priority %d\n", uxTaskPriorityGet(nullptr));
+    Serial.printf("driver(reader) launched at priority %d\n", uxTaskPriorityGet(nullptr));
 
     while (true)
     {
@@ -209,7 +207,7 @@ void pp_drv::drv_body(void)
 
 void pp_drv::drv_ackrcv(void)
 {
-    log_msg("diver(wsync) launched with priority %d\n", uxTaskPriorityGet(nullptr));
+    Serial.printf("diver(wsync) launched with priority %d\n", uxTaskPriorityGet(nullptr));
     while (true)
     {
         //P(isr_mutex);
@@ -254,6 +252,9 @@ void pp_drv::open(void)
     pinMode(FLAG, OUTPUT);
     digitalWrite(FLAG, HIGH);
     mode = INPUT;
+    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th);
+    xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th);
+    delay(50);
     //attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, HIGH);
 
@@ -311,14 +312,15 @@ void pp_drv::outchar(const char ct) // also called from ISR context!
 int pp_drv::write(const char *str, int len)
 {
     int ret = len;
-    //log_msg("write of %d chars - %s\n", len, str);
+    //log_msg("write of %d chars\n", len);
     if ((len == 0) || (len >= qs))
         return -1;
     setup_snd();
     while (digitalRead(PA2) == HIGH)
     {
-        log_msg("c64 busy...\n");
+        log_msg("C64 busy...\n");
         delay(500);
+        //printf("hugo %d", 20 / 0);
     }
     //log_msg("waiting for chars to be sent...\n");
     unsigned long t1 = millis(), t2;
@@ -344,10 +346,13 @@ int pp_drv::write(const char *str, int len)
         }
     }
     t2 = millis();
-    log_msg("sent %d chars in ", ret);
-    log_msg("%dms(", t2 - t1);
-    baud = ((float)ret) / (t2 - t1) * 8000;
-    log_msg("%.0f BAUD)\n", baud);
+    if (verbose)
+    {
+        log_msg("sent %d chars in ", ret);
+        log_msg("%dms(", t2 - t1);
+        baud  = ((float)ret) / (t2 - t1) * 8000;
+        log_msg("%.0f BAUD)\n", baud);
+    }
 out:
     setup_rcv();
     return ret;

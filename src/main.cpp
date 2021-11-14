@@ -4,21 +4,12 @@
 #include "logger.h"
 #include "co-routines.h"
 
-static pp_drv *drv;
+//#define TEST_MODEM
+#define ZIMODEM
 
-void setup()
-{
-    // put your setup code here, to run once:
-    Serial.begin(115200);
-    setup_log();
-    setup_cr();
-    delay(20);
-    drv = new pp_drv;
-    drv->open();
-
-    //drv.open();
-    //drv.setup_sender();
-}
+pp_drv drv;
+static char buf[MAX_AUX];
+static int ret;
 
 int process_cmd(char *cmd)
 {
@@ -27,17 +18,17 @@ int process_cmd(char *cmd)
     {
         for (auto cr : cr_base::coroutines)
         {
-            if (cr->match(cmd_buf, drv))
+            if (cr->match(cmd_buf, &drv))
                 return 1;
         }
         strncpy(cmd_buf, cmd_buf + 1, 3);
-        int ret = drv->read(cmd_buf + 3, 1);
+        int ret = drv.read(cmd_buf + 3, 1);
         if (ret != 1)
         {
             log_msg("process_cmd, read error: %d\n", ret);
             break;
         }
-        cmd_buf[4] = '\0';  // probably not needed.
+        cmd_buf[4] = '\0'; // probably not needed.
     }
     log_msg("Unknown command: '%s'\n", cmd);
 
@@ -98,6 +89,17 @@ uint8_t charset_p_topetcii(uint8_t c)
     return petcii_fix_dupes(c);
 }
 
+void string2petscii(char *buf, const char *str)
+{
+    int i = 0;
+    while (*str)
+    {
+        buf[i++] = charset_p_topetcii(*str);
+        str++;
+    }
+    buf[i] = '\0';
+}
+
 #define ASCII_UNMAPPED '.'
 
 uint8_t charset_p_toascii(uint8_t c, int cs)
@@ -145,12 +147,54 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
     return ((isprint(c) ? c : ASCII_UNMAPPED));
 }
 
+void zisetup_parallel(void);
+void ziloop_parallel(void);
+
+void setup()
+{
+    // put your setup code here, to run once:
+    Serial.begin(115200);
+    setup_log();
+    setup_cr();
+    delay(20);
+    drv.open();
+#ifdef ZIMODEM
+    zisetup_parallel();
+#endif
+
+#if 0
+    log_msg("Sending Hello World...\n");
+    string2petscii(buf, "hello c64 bbs world.");
+    if ((ret = drv.write(buf, strlen(buf))) != strlen(buf))
+        log_msg("write error: %d\n", ret);
+#endif
+}
+
 void loop()
 {
-    log_msg("Waiting for command from c64...\n");
+#ifdef TEST_MODEM
+    if ( 0 && Serial.available())
+    {
+        char c = Serial.read();
+        log_msg("sending: %c\n", c);
+        char cpet = charset_p_topetcii(c);
+        if ((ret = drv.write(&cpet, 1)) != 1)
+        {
+            log_msg("read error: %d\n", ret);
+        }
+    }
+    delay(5);
+    return;
+#endif
+#ifdef ZIMODEM
+    ziloop_parallel();
+    delay(10);
+    return;
+#endif
 
-    static char buf[MAX_AUX];
-    int ret = drv->read(buf, 4);
+    log_msg("Waiting for command from c64...\n");
+    
+    ret = drv.read(buf, 4);
     if (ret == 4)
     {
         buf[ret] = '\0';

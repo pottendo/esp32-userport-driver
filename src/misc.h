@@ -47,7 +47,7 @@ class ring_buf_t
     const int size;
     T *buffer;
     int w, r;
-    SemaphoreHandle_t wmutex, rmutex;
+    SemaphoreHandle_t wmutex, rmutex, mutex;
     bool unblock;
 
 public:
@@ -56,14 +56,18 @@ public:
         buffer = new T[sz];
         wmutex = xSemaphoreCreateCounting(sz, sz - 1);
         rmutex = xSemaphoreCreateCounting(sz, 0);
+        mutex = xSemaphoreCreateMutex();    // mutex for access to pointers
     }
     ~ring_buf_t() { delete[] buffer; }
 
     inline void put(T &item)
     {
         P(wmutex);
-        w++; w %= size;
+        //P(mutex);
+        w++;
+        w %= size;
         buffer[w] = item;
+        //V(mutex);
         V(rmutex);
     }
     inline bool get(T &item, bool block = true)
@@ -74,10 +78,26 @@ public:
             log_msg("ringbuffer corrupt r:%d, w:%d\n", r, w);
             return false;
         }
-        r++; r %= size;
+        //P(mutex);
+        r++;
+        r %= size;
         item = buffer[r];
+        //V(mutex);
         V(wmutex);
         return true;
+    }
+
+    inline T peek(void)
+    {
+        //_FMUTEX(mutex);
+        return buffer[r]; // maybe invalid (if empty)
+    }
+
+    inline int len(void)
+    {
+        //_FMUTEX(mutex);
+        int ret = (w - r + size) % size;
+        return ret;
     }
 };
 
