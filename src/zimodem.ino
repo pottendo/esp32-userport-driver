@@ -553,6 +553,6 @@ void ziloop_parallel()
   currMode->loop();
   zclock.tick();
 #ifdef MQTT
-  //loop_mqtt();
+  loop_mqtt();
 #endif
 }

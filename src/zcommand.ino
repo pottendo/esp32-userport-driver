@@ -82,7 +82,7 @@ void ZCommand::setConfigDefaults()
 {
   doEcho = true;
   autoStreamMode = false;
-  preserveListeners = false;
+  preserveListeners = true;
   ringCounter = 1;
   serial.setFlowControlType(DEFAULT_FCT);
   serial.setXON(true);
@@ -487,6 +487,7 @@ void ZCommand::parseConfigOptions(String configArguments[])
     f = SPIFFS.open(CONFIG_FILE_OLD, "r");
   String str = f.readString();
   f.close();
+  log_msg("%s - %s\n", __FUNCTION__, str.c_str());
   if ((str != null) && (str.length() > 0))
   {
     debugPrintf("Read Config: %s\n", str.c_str());
