@@ -470,7 +470,7 @@ void checkFactoryReset()
         if (resetPushTimer == 1)
           resetPushTimer++;
       }
-      else if ((millis() - resetPushTimer) > 5000)
+      else if ((millis() - resetPushTimer) > 20000)
       {
         log_msg("Factory reset running...\n");
         SPIFFS.remove(CONFIG_FILE);
@@ -538,7 +538,6 @@ void zisetup_parallel(void)
   dcdStatus = dcdInactive;
   s_pinWrite(pinDCD, dcdStatus);
   //flushSerial();
-
 }
 
 void ziloop_parallel()

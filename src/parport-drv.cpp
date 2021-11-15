@@ -46,26 +46,16 @@ void pp_drv::sp2_isr(void)
     if (digitalRead(SP2) == LOW)
     {
         digitalWrite(LED_BUILTIN, LOW);
-        log_msg_isr("SP2(LOW) isr - mode C64 -> ESP\n");
+        //log_msg_isr("SP2(LOW) isr - mode C64 -> ESP\n");
+        setup_rcv();    // make sure I/Os are setup to input to avoid conflicts on lines
     }
     else
     {
         digitalWrite(LED_BUILTIN, HIGH);
-        log_msg_isr("SP2(HIGH) isr - mode ESP->C64\n");
+        //log_msg_isr("SP2(HIGH) isr - mode ESP->C64\n");
     }
 }
 
-/*
-    static unsigned long sot = millis();
-    if ((millis() - sot) > 50)
-    {
-        curr_char = 0;
-    }
-    */
-//blink(100, 0);
-//sot = millis();
-
-static volatile bool not_ready = false;
 /* ISRs */
 void pp_drv::pc2_isr(void)
 {
@@ -170,29 +160,24 @@ void pp_drv::pc2_isr(void)
 pp_drv::pp_drv(uint16_t qs, uint16_t bs)
     : qs(qs), bs(bs), verbose(false)
 {
-    mutex = xSemaphoreCreateBinary();
-    V(mutex);
-    read_mutex = xSemaphoreCreateBinary();
-    active_drv = this;
     rx_queue = xQueueCreate(qs, sizeof(char));
     tx_queue = xQueueCreate(qs, sizeof(char));
     s1_queue = xQueueCreate(1, sizeof(int8_t));
     s2_queue = xQueueCreate(1, sizeof(int8_t));
-
+    active_drv = this;
 }
 
 pp_drv::~pp_drv()
 {
-    vSemaphoreDelete(mutex);
-    vSemaphoreDelete(out_mutex);
     vQueueDelete(rx_queue);
     vQueueDelete(tx_queue);
-    vTaskDelete(th);
+    vQueueDelete(s1_queue);
+    vQueueDelete(s2_queue);
 }
 
 void pp_drv::drv_body(void)
 {
-    char c;
+    unsigned char c;
     Serial.printf("driver(reader) launched at priority %d\n", uxTaskPriorityGet(nullptr));
 
     while (true)
@@ -210,7 +195,6 @@ void pp_drv::drv_ackrcv(void)
     Serial.printf("diver(wsync) launched with priority %d\n", uxTaskPriorityGet(nullptr));
     while (true)
     {
-        //P(isr_mutex);
         int8_t err;
         if (xQueueReceive(s1_queue, &err, portMAX_DELAY) == pdTRUE)
         {
@@ -224,7 +208,6 @@ void pp_drv::drv_ackrcv(void)
 void pp_drv::setup_snd(void)
 {
     //log_msg("C64 Terminal - sender");
-    //detachInterrupt(digitalPinToInterrupt(PC2));
     for (uint8_t i = _PB0; i <= _PB7; i++)
     {
         pinMode(PAR(i), OUTPUT);
@@ -233,6 +216,7 @@ void pp_drv::setup_snd(void)
     mode = OUTPUT;
 }
 
+// called from ISR context!
 void pp_drv::setup_rcv(void)
 {
     for (uint8_t i = _PB0; i <= _PB7; i++)
@@ -240,22 +224,20 @@ void pp_drv::setup_rcv(void)
         pinMode(PAR(i), INPUT);
     }
     mode = INPUT;
-    //attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, HIGH);
 }
 
 void pp_drv::open(void)
 {
-    ///blink(100, 3);
     pinMode(PA2, INPUT);
     pinMode(PC2, INPUT_PULLDOWN);
     pinMode(SP2, INPUT);
     pinMode(FLAG, OUTPUT);
     digitalWrite(FLAG, HIGH);
     mode = INPUT;
-    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th);
-    xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th);
-    delay(50);
-    //attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
+    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
+    xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
+    delay(50);  // give logger time to setup everything before first interrupts happen
+    attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, HIGH);
 
     setup_rcv();
@@ -263,32 +245,17 @@ void pp_drv::open(void)
 
 void pp_drv::close(void)
 {
-    blink(500, 2);
-    //detachInterrupt(digitalPinToInterrupt(SP2));
+    detachInterrupt(digitalPinToInterrupt(SP2));
     detachInterrupt(digitalPinToInterrupt(PC2));
+    vTaskDelete(th1);
+    vTaskDelete(th2);
 }
 
-int pp_drv::readstr(String **s)
+ssize_t pp_drv::read(void *buf_, size_t len, bool block)
 {
-    int av = 0;
-    while (av == 0)
-    {
-        P(mutex);
-        av = rqueue.size();
-        V(mutex);
-        delay(1);
-    }
-    P(mutex);
-    *s = rqueue.front();
-    rqueue.pop_front();
-    V(mutex);
-    return 0;
-}
-
-int pp_drv::read(char *buf, int len, bool block)
-{
+    unsigned char *buf = static_cast<unsigned char *>(buf_);
     int count = 0;
-    char c;
+    unsigned char c;
     while (len)
     {
         if (!ring_buf.get(c, block))
@@ -299,7 +266,8 @@ int pp_drv::read(char *buf, int len, bool block)
     return count;
 }
 
-void pp_drv::outchar(const char ct) // also called from ISR context!
+// also called from ISR context!
+void pp_drv::outchar(const char ct) 
 {
     for (uint8_t s = _PB0; (digitalRead(SP2) == HIGH) && (s <= _PB7); s++)
     {
@@ -309,10 +277,13 @@ void pp_drv::outchar(const char ct) // also called from ISR context!
     }
 }
 
-int pp_drv::write(const char *str, int len)
+ssize_t pp_drv::write(const void *buf, size_t len)
 {
+    const char *str = static_cast<const char *>(buf);
     int ret = len;
     //log_msg("write of %d chars\n", len);
+    //char c = *str;
+    //log_msg("write '%c'/0x%02x\n", ((c == '\0') ? '~' : c), c);
     if ((len == 0) || (len >= qs))
         return -1;
     setup_snd();
@@ -320,9 +291,7 @@ int pp_drv::write(const char *str, int len)
     {
         log_msg("C64 busy...\n");
         delay(500);
-        //printf("hugo %d", 20 / 0);
     }
-    //log_msg("waiting for chars to be sent...\n");
     unsigned long t1 = millis(), t2;
     outchar(*str);
     str++;
@@ -354,6 +323,7 @@ int pp_drv::write(const char *str, int len)
         log_msg("%.0f BAUD)\n", baud);
     }
 out:
+    delay(1);
     setup_rcv();
     return ret;
 }
