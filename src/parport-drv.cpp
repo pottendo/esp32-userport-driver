@@ -47,7 +47,7 @@ void pp_drv::sp2_isr(void)
     {
         digitalWrite(LED_BUILTIN, LOW);
         //log_msg_isr("SP2(LOW) isr - mode C64 -> ESP\n");
-        setup_rcv();    // make sure I/Os are setup to input to avoid conflicts on lines
+        setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
     }
     else
     {
@@ -236,7 +236,7 @@ void pp_drv::open(void)
     mode = INPUT;
     xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
-    delay(50);  // give logger time to setup everything before first interrupts happen
+    delay(50); // give logger time to setup everything before first interrupts happen
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, HIGH);
 
@@ -267,7 +267,7 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
 }
 
 // also called from ISR context!
-void pp_drv::outchar(const char ct) 
+void pp_drv::outchar(const char ct)
 {
     for (uint8_t s = _PB0; (digitalRead(SP2) == HIGH) && (s <= _PB7); s++)
     {
@@ -303,7 +303,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         str++;
     }
     flag_handshake();
-    int8_t err;
+    int8_t err = 0;
     float baud;
     if (xQueueReceive(s2_queue, &err, portMAX_DELAY) == pdTRUE)
     {
@@ -319,11 +319,11 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     {
         log_msg("sent %d chars in ", ret);
         log_msg("%dms(", t2 - t1);
-        baud  = ((float)ret) / (t2 - t1) * 8000;
+        baud = ((float)ret) / (t2 - t1) * 8000;
         log_msg("%.0f BAUD)\n", baud);
     }
 out:
-    delay(1);
+    if (ret == 1) delay(1);   // needed to proper sync for 1 char; not clear why
     setup_rcv();
     return ret;
 }

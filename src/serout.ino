@@ -183,12 +183,16 @@ bool ZSerial::isSerialOut()
   switch(flowControlType)
   {
   case FCT_RTSCTS:
+#ifndef PARALLEL_DRV
     if(pinSupport[pinCTS])
     {
       //debugPrintf("CTS: pin %d (%d == %d)\n",pinCTS,digitalRead(pinCTS),ctsActive);
       return (digitalRead(pinCTS) == ctsActive);
     }
     return true;
+#else
+    return HWSerial.ctsActive();
+#endif
   case FCT_NORMAL:
   case FCT_AUTOOFF:
   case FCT_MANUAL:

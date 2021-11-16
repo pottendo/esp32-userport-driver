@@ -111,7 +111,11 @@ public:
         va_start(args, s);
         vsnprintf(t, 256, s, args);
         write(t, strlen(t));
-    }   
+    }
+    bool ctsActive(void)
+    {
+        return (digitalRead(PA2) == LOW);
+    }
 };
 
 extern pp_drv drv;

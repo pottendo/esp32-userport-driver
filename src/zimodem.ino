@@ -66,7 +66,7 @@ const char compile_date[] = __DATE__ " " __TIME__;
 #define DEFAULT_PIN_DTR GPIO_NUM_27
 #define debugPrintf Serial.printf
 #define INCLUDE_SD_SHELL false
-#define DEFAULT_FCT FCT_DISABLED
+#define DEFAULT_FCT FCT_RTSCTS
 #define SerialConfig uint32_t
 #define UART_CONFIG_MASK 0x8000000
 #define UART_NB_BIT_MASK 0B00001100 | UART_CONFIG_MASK
@@ -132,7 +132,7 @@ const char compile_date[] = __DATE__ " " __TIME__;
 #define DEFAULT_DTR_LOW HIGH
 #endif
 
-#define DEFAULT_BAUD_RATE 1200
+#define DEFAULT_BAUD_RATE 38400     // was 1200
 #define DEFAULT_SERIAL_CONFIG SERIAL_8N1
 #define MAX_PIN_NO 50
 #define INTERNAL_FLOW_CONTROL_DIV 380
@@ -402,7 +402,59 @@ static int checkOpenConnections()
   return num;
 }
 
-void zisetup_serial()
+
+void checkFactoryReset()
+{
+#ifdef ZIMODEM_ESP32
+  if (!digitalRead(PIN_FACTORY_RESET))
+  {
+    if (resetPushTimer != 1)
+    {
+      if (resetPushTimer == 0)
+      {
+        log_msg("...really factory reset?\n");
+        resetPushTimer = millis();
+        if (resetPushTimer == 1)
+          resetPushTimer++;
+      }
+      else if ((millis() - resetPushTimer) > 20000)
+      {
+        log_msg("Factory reset running...\n");
+        SPIFFS.remove(CONFIG_FILE);
+        SPIFFS.remove(CONFIG_FILE_OLD);
+        goto out;
+        SPIFFS.remove("/zphonebook.txt");
+        SPIFFS.remove("/zlisteners.txt");
+        PhoneBookEntry::clearPhonebook();
+        SPIFFS.end();
+        SPIFFS.format();
+        SPIFFS.begin();
+        PhoneBookEntry::clearPhonebook();
+        if (WiFi.status() == WL_CONNECTED)
+          WiFi.disconnect();
+        baudRate = DEFAULT_BAUD_RATE;
+        commandMode.loadConfig();
+        PhoneBookEntry::loadPhonebook();
+        dcdStatus = dcdInactive;
+        s_pinWrite(pinDCD, dcdStatus);
+        wifiSSI = "";
+        wifiConnected = false;
+        delay(500);
+      out:
+        zclock.reset();
+        commandMode.reset();
+        resetPushTimer = 1;
+      }
+    }
+  }
+  else if (resetPushTimer != 0)
+    resetPushTimer = 0;
+#endif
+}
+
+#ifndef PARALLEL_DRV
+
+void setup()
 {
   for (int i = 0; i < MAX_PIN_NO; i++)
     pinSupport[i] = false;
@@ -455,55 +507,7 @@ void zisetup_serial()
   s_pinWrite(DEFAULT_PIN_HS, (baudRate >= DEFAULT_HS_BAUD) ? DEFAULT_HS_ACTIVE : DEFAULT_HS_INACTIVE);
 #endif
 }
-
-void checkFactoryReset()
-{
-#ifdef ZIMODEM_ESP32
-  if (!digitalRead(PIN_FACTORY_RESET))
-  {
-    if (resetPushTimer != 1)
-    {
-      if (resetPushTimer == 0)
-      {
-        log_msg("...really factory reset?\n");
-        resetPushTimer = millis();
-        if (resetPushTimer == 1)
-          resetPushTimer++;
-      }
-      else if ((millis() - resetPushTimer) > 20000)
-      {
-        log_msg("Factory reset running...\n");
-        SPIFFS.remove(CONFIG_FILE);
-        SPIFFS.remove(CONFIG_FILE_OLD);
-        SPIFFS.remove("/zphonebook.txt");
-        SPIFFS.remove("/zlisteners.txt");
-        PhoneBookEntry::clearPhonebook();
-        SPIFFS.end();
-        SPIFFS.format();
-        SPIFFS.begin();
-        PhoneBookEntry::clearPhonebook();
-        if (WiFi.status() == WL_CONNECTED)
-          WiFi.disconnect();
-        baudRate = DEFAULT_BAUD_RATE;
-        commandMode.loadConfig();
-        PhoneBookEntry::loadPhonebook();
-        dcdStatus = dcdInactive;
-        s_pinWrite(pinDCD, dcdStatus);
-        wifiSSI = "";
-        wifiConnected = false;
-        delay(500);
-        zclock.reset();
-        commandMode.reset();
-        resetPushTimer = 1;
-      }
-    }
-  }
-  else if (resetPushTimer != 0)
-    resetPushTimer = 0;
-#endif
-}
-
-void ziloop_serial()
+void loop()
 {
   checkFactoryReset();
   if (HWSerial.available())
@@ -516,7 +520,9 @@ void ziloop_serial()
   //loop_mqtt();
 #endif
 }
+#endif
 
+#ifdef PARALLEL_DRV
 void zisetup_parallel(void)
 {
   for (int i = 0; i < MAX_PIN_NO; i++)
@@ -552,6 +558,8 @@ void ziloop_parallel()
   currMode->loop();
   zclock.tick();
 #ifdef MQTT
-  loop_mqtt();
+  //loop_mqtt();
 #endif
 }
+
+#endif /* PARALLEL_DRV */
