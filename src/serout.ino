@@ -368,7 +368,7 @@ void ZSerial::flush()
 {
   while((TBUFtail != TBUFhead) && (isSerialOut()))
   {
-    log_msg("%s - tail=%d, head=%d\n", __FUNCTION__, TBUFtail, TBUFhead);
+    //log_msg("%s - tail=%d, head=%d\n", __FUNCTION__, TBUFtail, TBUFhead);
     hwSerialFlush();
     serialOutDeque();
     yield();
