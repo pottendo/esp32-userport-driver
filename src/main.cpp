@@ -4,8 +4,8 @@
 #include "logger.h"
 #include "co-routines.h"
 
-//#define TEST_MODEM
-#define ZIMODEM
+#define TEST_FW
+//#define ZIMODEM
 
 pp_drv drv;
 static char buf[MAX_AUX];
@@ -172,15 +172,39 @@ void setup()
 
 void loop()
 {
-#ifdef TEST_MODEM
-    if ( 0 && Serial.available())
+#ifdef TEST_FW
+    if (Serial.available())
     {
+        static char buf[80];
+        static int idx = 1;
         char c = Serial.read();
-        log_msg("sending: %c\n", c);
-        char cpet = charset_p_topetcii(c);
-        if ((ret = drv.write(&cpet, 1)) != 1)
+        if (c == '\n')
         {
-            log_msg("read error: %d\n", ret);
+            buf[0] = idx;
+            buf[idx--] = '\0';
+            log_msg("sending: '%s'\n", buf+1);
+            string2petscii(buf+1, buf+1);
+
+            drv.sync4write();
+            //delay(1000);
+            log_msg("synced for write... writing %d byte...\n", idx);
+            if ((ret = drv.write(buf, 1)) != 1)
+            {
+                log_msg("len write error: %d\n", ret);
+            }
+            idx--;
+            drv.sync4write();
+            if ((ret = drv.write(buf + 1, idx)) != idx)
+            {
+                log_msg("data write error: %d\n", ret);
+            }
+            log_msg("...done.\n");
+            idx = 1;
+        }
+        else   
+        {
+            buf[idx++] = c;
+            log_msg("%c", c);
         }
     }
     delay(5);
@@ -193,7 +217,7 @@ void loop()
 #endif
 
     log_msg("Waiting for command from c64...\n");
-    
+
     ret = drv.read(buf, 4);
     if (ret == 4)
     {

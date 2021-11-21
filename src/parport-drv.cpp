@@ -290,7 +290,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     while (digitalRead(PA2) == HIGH)
     {
         log_msg("C64 busy...\n");
-        delay(500);
+        delay(100);
     }
     unsigned long t1 = millis(), t2;
     outchar(*str);
@@ -326,4 +326,13 @@ out:
     if (ret == 1) delay(1);   // needed to proper sync for 1 char; not clear why
     setup_rcv();
     return ret;
+}
+
+void pp_drv::sync4write(void)
+{
+    flag_handshake();
+    while (digitalRead(PA2) == HIGH)
+    {
+        delay(1);
+    }
 }

@@ -84,9 +84,9 @@ public:
 
     int writestr(String &s) { return write(s.c_str(), s.length()); }
     ssize_t write(const void *s, size_t len);
-    ssize_t read(void *buf, size_t len, bool block = true);
-
     size_t write(uint8_t c) { return write((const char *)(&c), 1); }
+    void sync4write(void);
+    ssize_t read(void *buf, size_t len, bool block = true);
     int available(void) { return ring_buf.len(); }
     int read(void)
     {

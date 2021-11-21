@@ -47,6 +47,7 @@ void log_task_func(void *p)
             V(log_mutex);
             //printf(t);
             Serial.print(t);
+            //Serial.flush();
             P(log_mutex);
             log_buffer.pop_front();
         }
