@@ -180,25 +180,23 @@ void loop()
         char c = Serial.read();
         if (c == '\n')
         {
-            buf[0] = idx;
+            buf[0] = idx - 2;
             buf[idx--] = '\0';
-            log_msg("sending: '%s'\n", buf+1);
+            // log_msg("sending: '%s', len = %d\n", buf+1, buf[0]);
             string2petscii(buf+1, buf+1);
 
             drv.sync4write();
-            //delay(1000);
-            log_msg("synced for write... writing %d byte...\n", idx);
+            //log_msg("synced for write... writing %d byte...\n", idx);
             if ((ret = drv.write(buf, 1)) != 1)
             {
                 log_msg("len write error: %d\n", ret);
             }
             idx--;
-            drv.sync4write();
+            //delay(1000);
             if ((ret = drv.write(buf + 1, idx)) != idx)
             {
                 log_msg("data write error: %d\n", ret);
             }
-            log_msg("...done.\n");
             idx = 1;
         }
         else   
