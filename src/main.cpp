@@ -3,6 +3,8 @@
 #include "misc.h"
 #include "logger.h"
 #include "co-routines.h"
+#include "irc.h"
+#include "pet2asc.h"
 
 #define TEST_FW
 //#define ZIMODEM
@@ -94,7 +96,7 @@ void string2petscii(char *buf, const char *str)
     int i = 0;
     while (*str)
     {
-        buf[i++] = charset_p_topetcii(*str);
+        buf[i++] = ascToPetcii(*str); //charset_p_topetcii(*str);
         str++;
     }
     buf[i] = '\0';
@@ -158,15 +160,9 @@ void setup()
     setup_cr();
     delay(20);
     drv.open();
+    setup_irc();
 #ifdef ZIMODEM
     zisetup_parallel();
-#endif
-
-#if 0
-    log_msg("Sending Hello World...\n");
-    string2petscii(buf, "hello c64 bbs world.");
-    if ((ret = drv.write(buf, strlen(buf))) != strlen(buf))
-        log_msg("write error: %d\n", ret);
 #endif
 }
 
@@ -183,7 +179,7 @@ void loop()
             buf[0] = idx - 2;
             buf[idx--] = '\0';
             // log_msg("sending: '%s', len = %d\n", buf+1, buf[0]);
-            string2petscii(buf+1, buf+1);
+            string2petscii(buf + 1, buf + 1);
 
             drv.sync4write();
             //log_msg("synced for write... writing %d byte...\n", idx);
@@ -199,13 +195,46 @@ void loop()
             }
             idx = 1;
         }
-        else   
+        else
         {
             buf[idx++] = c;
             log_msg("%c", c);
         }
     }
     delay(5);
+    loop_irc();
+    static String s;
+    if (irc_get_msg(s))
+    {
+        static char ibuf[128];
+        String t;
+        log_msg("IRC msg '%s' len: %d\n", s.c_str(), s.length());
+        int it, i = 0, e = s.length();
+        while (i < e)
+        {
+            it = ((i + 77) < e) ? (i + 77) : e;
+            String t = s.substring(i, it);
+            log_msg("\t'%s'\n", t.c_str());
+            if ((e - i) <= 0)
+                break;
+            i += 77;
+            ibuf[0] = t.length();
+            string2petscii(ibuf + 1, t.c_str());
+            drv.sync4write();
+            log_msg("synced for write... writing %d byte...\n", ibuf[0] + 1);
+            if ((ret = drv.write(ibuf, 1)) != 1)
+            {
+                log_msg("len write error: %d\n", ret);
+            }
+            //delay(1000);
+            if ((ret = drv.write(ibuf + 1, ibuf[0])) != ibuf[0])
+            {
+                log_msg("data write error: %d\n", ret);
+            }
+            delay(200);
+        }
+    }
+    delay(100);
     return;
 #endif
 #ifdef ZIMODEM

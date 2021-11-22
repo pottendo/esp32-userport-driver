@@ -30,8 +30,10 @@
   static HardwareSerial HWSerial(UART_NUM_2);
 #endif
 #else
+#ifndef PARALLEL_DRV
 # include "ESP8266WiFi.h"
 # define HWSerial Serial
+#endif
 #endif
 
 #include <FS.h>
