@@ -4,17 +4,10 @@
 #include <list>
 #include "irc.h"
 #include "logger.h"
+#include "cred.h"
 
 static IRCClient *iclient;
 static WiFiClientSecure *wclient;
-#define ssid "pottendo"
-#define password "poTtendosWLAN"
-
-#define IRC_SERVER "irc.libera.chat"
-#define IRC_PORT 6697
-#define IRC_NICKNAME "esppottendo"
-#define IRC_USER "pottendo"
-#define IRC_CHANNEL "#vice-dev"
 
 static std::list<String> msgs;
 void callback(IRCMessage ircMessage)
