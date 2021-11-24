@@ -168,7 +168,43 @@ void setup()
 
 void loop()
 {
+    loop_irc(drv);
+    return;
+
+#ifdef ZIMODEM
+    ziloop_parallel();
+    delay(10);
+    return;
+#endif
+    log_msg("Waiting for command from c64...\n");
+    ret = drv.read(buf, 4);
+    if (ret == 4)
+    {
+        buf[ret] = '\0';
+        if (!process_cmd(buf))
+        {
+            log_msg("Unknown CoRoutine... %s\n", buf);
+        }
+    }
+    else
+    {
+        static int retry = 0;
+        log_msg("read error(%d'th time): %d\n", ++retry, ret);
+        if (retry > 10)
+        {
+            log_msg("...giving up & rebooting\n");
+            ESP.restart();
+        }
+        delay(500);
+    }
+    loop_log();
+    delay(100);
+}
+
+
 #ifdef TEST_FW
+void terminal(void) 
+{
     if (Serial.available())
     {
         static char buf[80];
@@ -202,69 +238,6 @@ void loop()
         }
     }
     delay(5);
-    loop_irc();
-    static String s;
-    if (irc_get_msg(s))
-    {
-        static char ibuf[128];
-        String t;
-        log_msg("IRC msg '%s' len: %d\n", s.c_str(), s.length());
-        int it, i = 0, e = s.length();
-        while (i < e)
-        {
-            it = ((i + 77) < e) ? (i + 77) : e;
-            String t = s.substring(i, it);
-            log_msg("\t'%s'\n", t.c_str());
-            if ((e - i) <= 0)
-                break;
-            i += 77;
-            ibuf[0] = t.length();
-            string2petscii(ibuf + 1, t.c_str());
-            drv.sync4write();
-            log_msg("synced for write... writing %d byte...\n", ibuf[0] + 1);
-            if ((ret = drv.write(ibuf, 1)) != 1)
-            {
-                log_msg("len write error: %d\n", ret);
-            }
-            //delay(1000);
-            if ((ret = drv.write(ibuf + 1, ibuf[0])) != ibuf[0])
-            {
-                log_msg("data write error: %d\n", ret);
-            }
-            delay(200);
-        }
-    }
-    delay(100);
     return;
-#endif
-#ifdef ZIMODEM
-    ziloop_parallel();
-    delay(10);
-    return;
-#endif
-
-    log_msg("Waiting for command from c64...\n");
-
-    ret = drv.read(buf, 4);
-    if (ret == 4)
-    {
-        buf[ret] = '\0';
-        if (!process_cmd(buf))
-        {
-            log_msg("Unknown CoRoutine... %s\n", buf);
-        }
-    }
-    else
-    {
-        static int retry = 0;
-        log_msg("read error(%d'th time): %d\n", ++retry, ret);
-        if (retry > 10)
-        {
-            log_msg("...giving up & rebooting\n");
-            ESP.restart();
-        }
-        delay(500);
-    }
-    loop_log();
-    delay(100);
 }
+#endif

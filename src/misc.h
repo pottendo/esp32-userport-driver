@@ -63,11 +63,11 @@ public:
     inline void put(T &item)
     {
         P(wmutex);
-        //P(mutex);
+        P(mutex);
         w++;
         w %= size;
         buffer[w] = item;
-        //V(mutex);
+        V(mutex);
         V(rmutex);
     }
     inline bool get(T &item, bool block = true)
@@ -78,28 +78,30 @@ public:
             log_msg("ringbuffer corrupt r:%d, w:%d\n", r, w);
             return false;
         }
-        //P(mutex);
+        P(mutex);
         r++;
         r %= size;
         item = buffer[r];
-        //V(mutex);
+        V(mutex);
         V(wmutex);
         return true;
     }
 
     inline T peek(void)
     {
-        //_FMUTEX(mutex);
+        _FMUTEX(mutex);
         return buffer[r]; // maybe invalid (if empty)
     }
 
     inline int len(void)
     {
-        //_FMUTEX(mutex);
+        _FMUTEX(mutex);
         int ret = (w - r + size) % size;
         return ret;
     }
 };
 
 uint8_t charset_p_topetcii(uint8_t c);
+uint8_t charset_p_toascii(uint8_t c, int cs);
+void string2petscii(char *buf, const char *str);
 #endif

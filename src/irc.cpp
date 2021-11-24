@@ -5,6 +5,8 @@
 #include "irc.h"
 #include "logger.h"
 #include "cred.h"
+#include "misc.h"
+#include "pet2asc.h"
 
 static IRCClient *iclient;
 static WiFiClientSecure *wclient;
@@ -75,7 +77,7 @@ void setup_irc(void)
     iclient->sendRaw("JOIN " + String{IRC_CHANNEL});
 }
 
-void loop_irc(void)
+static void _loop_irc(void)
 {
     if (!iclient->connected())
     {
@@ -93,4 +95,67 @@ void loop_irc(void)
     }
 
     iclient->loop();
+}
+
+void loop_irc(pp_drv &drv)
+{
+    size_t ret;
+    _loop_irc();
+    static String s;
+    if (irc_get_msg(s))
+    {
+        static char ibuf[128];
+        String t;
+        log_msg("IRC msg '%s' len: %d\n", s.c_str(), s.length());
+        int it, i = 0, e = s.length();
+        while (i < e)
+        {
+            it = ((i + 77) < e) ? (i + 77) : e;
+            String t = s.substring(i, it);
+            log_msg("\t'%s'\n", t.c_str());
+            if ((e - i) <= 0)
+                break;
+            i += 77;
+            ibuf[0] = t.length();
+            string2petscii(ibuf + 1, t.c_str());
+            drv.sync4write();
+            log_msg("synced for write... writing %d byte...\n", ibuf[0] + 1);
+            if ((ret = drv.write(ibuf, 1)) != 1)
+            {
+                log_msg("len write error: %d\n", ret);
+            }
+            //delay(1000);
+            if ((ret = drv.write(ibuf + 1, ibuf[0])) != ibuf[0])
+            {
+                log_msg("data write error: %d\n", ret);
+            }
+            delay(200);
+        }
+    }
+    if (drv.available() > 0)
+    {
+        // C64 user posted something
+        static char buf[256];
+        static int idx = 0;
+        int c;
+        while (drv.available() && (idx < 256))
+        {
+            c = drv.read();
+            if (c < 0)
+            {
+                log_msg("read error: %d\n", c);
+                continue;
+            }
+            if (c == 0)
+            {
+                buf[idx] = 0;
+                log_msg("idx = %d, C64 posted: %s\n", idx, buf);
+                idx = 0;
+                iclient->sendMessage(IRC_CHANNEL, String{buf});
+                break;
+            }
+            buf[idx++] = charset_p_toascii(c, true);
+        }
+        //delay(100);
+    }
 }
