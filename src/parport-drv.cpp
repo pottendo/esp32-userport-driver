@@ -330,9 +330,16 @@ out:
 
 void pp_drv::sync4write(void)
 {
+    unsigned long t = millis();
     flag_handshake();
     while (digitalRead(PA2) == HIGH)
     {
         delay(1);
+        if ((millis() - t) > 500)
+        {
+            flag_handshake();
+            t = millis();
+            //log_msg("kicking handshake\n");
+        }
     }
 }

@@ -8,10 +8,15 @@
 #include "misc.h"
 #include "pet2asc.h"
 
+//#define TEST_IRC
+
+static SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
+static std::list<String> msgs;
+
+#ifndef TEST_IRC
 static IRCClient *iclient;
 static WiFiClientSecure *wclient;
 
-static std::list<String> msgs;
 void callback(IRCMessage ircMessage)
 {
     // PRIVMSG ignoring CTCP messages
@@ -19,7 +24,11 @@ void callback(IRCMessage ircMessage)
     {
         String message(ircMessage.nick + ">" + ircMessage.text);
         log_msg(message + '\n');
+        P(mutex);
+        if (msgs.size() > 500)
+            msgs.pop_front();
         msgs.push_back(message);
+        V(mutex);
         return;
     }
     //log_msg(ircMessage.original + '\n');
@@ -35,9 +44,11 @@ void send_msg(String s)
 {
     iclient->sendRaw(s);
 }
+#endif /* TEST_IRC */
 
 bool irc_get_msg(String &s)
 {
+    _FMUTEX(mutex);
     if (msgs.size() == 0)
         return false;
 
@@ -46,8 +57,25 @@ bool irc_get_msg(String &s)
     return true;
 }
 
+#ifdef TEST_IRC
+void dummy_server(void *p)
+{
+    log_msg("IRC dummy server started...\n");
+    int cnt = 0;
+    srand(millis());
+    while (true)
+    {
+        P(mutex);
+        msgs.push_back(String{"Dummy IRC message: "} + String{cnt++});
+        V(mutex);
+        delay(500 + rand() % 3000);
+    }
+}
+#endif
+
 void setup_irc(void)
 {
+#ifndef TEST_IRC
     if (!WiFi.isConnected())
     {
         WiFi.begin(ssid, password);
@@ -75,10 +103,15 @@ void setup_irc(void)
     iclient->setCallback(callback);
     iclient->setSentCallback(debugSentCallback);
     iclient->sendRaw("JOIN " + String{IRC_CHANNEL});
+#else
+    TaskHandle_t th;
+    xTaskCreate(dummy_server, "IRC Fake", 4000, nullptr, uxTaskPriorityGet(nullptr), &th);
+#endif
 }
 
 static void _loop_irc(void)
 {
+#ifndef TEST_IRC
     if (!iclient->connected())
     {
         log_msg("reconnecting IRC...");
@@ -95,6 +128,7 @@ static void _loop_irc(void)
     }
 
     iclient->loop();
+#endif
 }
 
 void loop_irc(pp_drv &drv)
@@ -119,17 +153,19 @@ void loop_irc(pp_drv &drv)
             ibuf[0] = t.length();
             string2petscii(ibuf + 1, t.c_str());
             drv.sync4write();
-            log_msg("synced for write... writing %d byte...\n", ibuf[0] + 1);
+            //log_msg("synced for write... writing %d byte...\n", ibuf[0] + 1);
             if ((ret = drv.write(ibuf, 1)) != 1)
             {
                 log_msg("len write error: %d\n", ret);
             }
+            //log_msg("...wrote length...\n");
             //delay(1000);
             if ((ret = drv.write(ibuf + 1, ibuf[0])) != ibuf[0])
             {
                 log_msg("data write error: %d\n", ret);
             }
-            delay(200);
+            //log_msg("...and data\n");
+            delay(100);
         }
     }
     if (drv.available() > 0)
@@ -149,13 +185,15 @@ void loop_irc(pp_drv &drv)
             if (c == 0)
             {
                 buf[idx] = 0;
-                log_msg("idx = %d, C64 posted: %s\n", idx, buf);
-                idx = 0;
+                log_msg("idx = %d, IRC post: %s\n", idx, buf);
+#ifndef TEST_IRC
                 iclient->sendMessage(IRC_CHANNEL, String{buf});
+#endif
+                idx = 0;
                 break;
             }
             buf[idx++] = charset_p_toascii(c, true);
         }
-        //delay(100);
     }
+    delay(100);
 }
