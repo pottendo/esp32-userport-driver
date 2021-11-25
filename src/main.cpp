@@ -160,7 +160,6 @@ void setup()
     setup_cr();
     delay(20);
     drv.open();
-    setup_irc();
 #ifdef ZIMODEM
     zisetup_parallel();
 #endif
@@ -168,9 +167,6 @@ void setup()
 
 void loop()
 {
-    loop_irc(drv);
-    return;
-
 #ifdef ZIMODEM
     ziloop_parallel();
     delay(10);

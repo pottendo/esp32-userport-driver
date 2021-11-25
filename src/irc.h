@@ -3,7 +3,18 @@
 
 #include "parport-drv.h"
 
-void setup_irc(void);
-void loop_irc(pp_drv &drv);
+//#define TEST_IRC
+
+class irc_t
+{
+#ifdef TEST_IRC
+    TaskHandle_t th;
+#endif
+public:
+    irc_t();
+    ~irc_t();
+    bool loop(pp_drv &drv);
+    bool get_msg(String &s);
+};
 
 #endif

@@ -8,8 +8,6 @@
 #include "misc.h"
 #include "pet2asc.h"
 
-//#define TEST_IRC
-
 static SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
 static std::list<String> msgs;
 
@@ -17,7 +15,7 @@ static std::list<String> msgs;
 static IRCClient *iclient;
 static WiFiClientSecure *wclient;
 
-void callback(IRCMessage ircMessage)
+static void callback(IRCMessage ircMessage)
 {
     // PRIVMSG ignoring CTCP messages
     if (ircMessage.command == "PRIVMSG" && ircMessage.text[0] != '\001')
@@ -35,18 +33,18 @@ void callback(IRCMessage ircMessage)
     msgs.push_back(ircMessage.original);
 }
 
-void debugSentCallback(String data)
+static void debugSentCallback(String data)
 {
     log_msg(data + '\n');
 }
 
-void send_msg(String s)
+static void send_msg(String s)
 {
     iclient->sendRaw(s);
 }
 #endif /* TEST_IRC */
 
-bool irc_get_msg(String &s)
+bool irc_t::get_msg(String &s)
 {
     _FMUTEX(mutex);
     if (msgs.size() == 0)
@@ -58,7 +56,7 @@ bool irc_get_msg(String &s)
 }
 
 #ifdef TEST_IRC
-void dummy_server(void *p)
+static void dummy_server(void *p)
 {
     log_msg("IRC dummy server started...\n");
     int cnt = 0;
@@ -73,7 +71,7 @@ void dummy_server(void *p)
 }
 #endif
 
-void setup_irc(void)
+irc_t::irc_t(void)
 {
 #ifndef TEST_IRC
     if (!WiFi.isConnected())
@@ -104,8 +102,14 @@ void setup_irc(void)
     }
     iclient->sendRaw("JOIN " + String{IRC_CHANNEL});
 #else
-    TaskHandle_t th;
     xTaskCreate(dummy_server, "IRC Fake", 4000, nullptr, uxTaskPriorityGet(nullptr), &th);
+#endif
+}
+
+irc_t::~irc_t()
+{
+#ifdef TEST_IRC
+    vTaskDelete(th);
 #endif
 }
 
@@ -131,12 +135,12 @@ static void _loop_irc(void)
 #endif
 }
 
-void loop_irc(pp_drv &drv)
+bool irc_t::loop(pp_drv &drv)
 {
     size_t ret;
     _loop_irc();
     static String s;
-    if (irc_get_msg(s))
+    if (get_msg(s))
     {
         static char ibuf[128];
         String t;
@@ -186,6 +190,8 @@ void loop_irc(pp_drv &drv)
             {
                 buf[idx] = 0;
                 log_msg("idx = %d, IRC post: %s\n", idx, buf);
+                if (strcmp(buf, "_quit") == 0)
+                    return false;
 #ifndef TEST_IRC
                 iclient->sendMessage(IRC_CHANNEL, String{buf});
 #endif
@@ -196,4 +202,5 @@ void loop_irc(pp_drv &drv)
         }
     }
     delay(100);
+    return true;
 }

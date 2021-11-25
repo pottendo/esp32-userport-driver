@@ -3,6 +3,7 @@
 
 #include <list>
 #include "logger.h"
+#include "irc.h"
 
 void setup_cr(void);
 void loop_cr(void);
@@ -212,4 +213,18 @@ public:
     }
 };
 
+class cr_irc_t : public cr_base
+{
+public:
+    cr_irc_t(const char *n) : cr_base(String{n}) { reg(); }
+    ~cr_irc_t() = default;
+
+    bool setup(void) override { return true; };
+    bool run(pp_drv *drv) override
+    {
+        irc_t irc;
+        while (irc.loop(*drv))
+            delay(1);
+    }
+};
 #endif

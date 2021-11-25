@@ -13,6 +13,7 @@ void setup_cr(void)
     new cr_dump_t{"DUM1"};
     new cr_read_t{"READ"};
     new cr_dump2_t{"DUM2"};
+    new cr_irc_t{"IRC_"};
 }
 
 void loop_cr(void)
