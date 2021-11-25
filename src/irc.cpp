@@ -89,6 +89,8 @@ void setup_irc(void)
     wclient = new WiFiClientSecure;
     wclient->setInsecure();
     iclient = new IRCClient{IRC_SERVER, IRC_PORT, *wclient};
+    iclient->setCallback(callback);
+    iclient->setSentCallback(debugSentCallback);
     delay(500);
     // Attempt to connect
     log_msg("attempting IRC connection to %s:%d\n", IRC_SERVER, IRC_PORT);
@@ -100,8 +102,6 @@ void setup_irc(void)
         }
         delay(1000);
     }
-    iclient->setCallback(callback);
-    iclient->setSentCallback(debugSentCallback);
     iclient->sendRaw("JOIN " + String{IRC_CHANNEL});
 #else
     TaskHandle_t th;
