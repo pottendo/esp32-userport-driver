@@ -64,7 +64,7 @@ static void dummy_server(void *p)
     while (true)
     {
         P(mutex);
-        msgs.push_back(String{"Dummy IRC message: "} + String{cnt++});
+        msgs.push_back(String{"Dummy IRC message: @_"} + String{cnt++});
         V(mutex);
         delay(500 + rand() % 3000);
     }
@@ -135,6 +135,21 @@ static void _loop_irc(void)
 #endif
 }
 
+void irc_t::annotate4irc(char *s, int l)
+{
+
+    for (int i = 0; i < l; i++)
+    {   
+        char c = s[i];
+        if ((c == ' ') || (c == '>'))
+            break;
+        if ((c >= 'A') && (c <= 'Z'))
+            s[i] |= 0x80;
+        if ((c >= 'a') && (c <= 'z'))
+            s[i] |= 0x80;
+    }
+}
+
 bool irc_t::loop(pp_drv &drv)
 {
     size_t ret;
@@ -156,6 +171,7 @@ bool irc_t::loop(pp_drv &drv)
             i += 77;
             ibuf[0] = t.length();
             string2petscii(ibuf + 1, t.c_str());
+            annotate4irc(ibuf+1, ibuf[0]);
             drv.sync4write();
             //log_msg("synced for write... writing %d byte...\n", ibuf[0] + 1);
             if ((ret = drv.write(ibuf, 1)) != 1)
@@ -186,14 +202,14 @@ bool irc_t::loop(pp_drv &drv)
                 log_msg("read error: %d\n", c);
                 continue;
             }
-            if (c == 0)
+            if (c == 0xa0)
             {
                 buf[idx] = 0;
-                log_msg("idx = %d, IRC post: %s\n", idx, buf);
-                if (strcmp(buf, "_quit") == 0)
+                log_msg("idx = %d, IRC post: '%s'\n", idx, buf);
+                if (strcmp(buf, "*qui*") == 0)
                     return false;
 #ifndef TEST_IRC
-                iclient->sendMessage(IRC_CHANNEL, String{buf});
+                iclient->sendMessage("pottendo" /*IRC_CHANNEL*/, String{buf});
 #endif
                 idx = 0;
                 break;

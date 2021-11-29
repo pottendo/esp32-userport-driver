@@ -10,6 +10,7 @@ class irc_t
 #ifdef TEST_IRC
     TaskHandle_t th;
 #endif
+    void annotate4irc(char *s, int l);
 public:
     irc_t();
     ~irc_t();

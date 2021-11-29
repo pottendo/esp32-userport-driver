@@ -261,6 +261,7 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
         if (!ring_buf.get(c, block))
             return -1;
         buf[count++] = c;
+        //log_msg("rcv: 0x%02x/'%c'\n", c, (isPrintable(c)?c:'~'));
         len--;
     }
     return count;
