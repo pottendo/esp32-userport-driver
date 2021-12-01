@@ -7,6 +7,7 @@
 #include "pet2asc.h"
 
 #define TEST_FW
+#define EXT80COLS
 //#define ZIMODEM
 
 pp_drv drv;
@@ -52,6 +53,7 @@ static uint8_t petcii_fix_dupes(uint8_t c)
 
 uint8_t charset_p_topetcii(uint8_t c)
 {
+    //log_msg("before conv: '%c'/0x%02x\n", (isPrintable(c)?c:'~'), c);
     /* map ascii to petscii */
     if (c == '\n')
         return 0x0d; /* petscii "return" */
@@ -78,13 +80,25 @@ uint8_t charset_p_topetcii(uint8_t c)
     else if ((c >= 'a') && (c <= 'z'))
     {
         /* lowercase (petscii 0x41 -) */
+#ifdef EXT80COLS
+    char c1 = (c - 'a') + 1;
+    log_msg("lowercase ret: '%c'/0x%02x\n", (isPrintable(c1)?c1:'~'), c1);
+    return c1;
+#else
         return (uint8_t)((c - 'a') + 1);
+#endif
     }
     else if ((c >= 'A') && (c <= 'Z'))
     {
         /* uppercase (petscii 0xc1 -)
            (don't use duplicate codes 0x61 - ) */
-        return  c; //(uint8_t)((c + 0x20));
+#ifdef EXT80COLS
+    char c1 = c + 0x20;
+    log_msg("Uppercas ret: '%c'/0x%02x\n", (isPrintable(c1)?c1:'~'), c1);
+    return c1;
+#else
+        return c; //(uint8_t)((c + 0x20));
+#endif
     }
     else if (c <= 0x1f)
         /* unhandled ctrl codes */
@@ -119,13 +133,13 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
         //log_msg("before conv: 0x%02x\n", c);
         /* convert ctrl chars to "screencodes" (used by monitor) */
         if (c == 0x64)
-            c = 95;    // underline '_'
+            c = 95; // underline '_'
         if (c == 0x1c)
-            c = 35;    // pound sign
+            c = 35; // pound sign
         if (c == 0x1e)
-            c = 94;    // arrow up
+            c = 94; // arrow up
         if (c == 0x1f)
-            c = 60;    // arrow left mapped to '<'
+            c = 60; // arrow left mapped to '<'
         if ((c >= 0x41) && (c <= 0x5a))
             c += 0x20;
         if (c <= 0x1f)
@@ -155,7 +169,7 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
     else if ((c >= 0xc1) && (c <= 0xda))
     {
         /* uppercase (petscii 0xc1 -) */
-        
+
         return (uint8_t)((c - 0xc1) + 'A');
     }
     else if ((c >= 0x41) && (c <= 0x5a))
@@ -170,11 +184,6 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
 void zisetup_parallel(void);
 void ziloop_parallel(void);
 
-char myAsc2Petcii(int i)
-{
-    //    return myAsc2PetciiTable[i];
-}
-
 void setup()
 {
     // put your setup code here, to run once:
@@ -187,21 +196,6 @@ void setup()
     zisetup_parallel();
 #endif
     return;
-
-    for (int i = 0; i < 256; i++)
-    {
-        char c;
-        c = i;
-        log_msg("a:0x%02x/%c, ", c, (isPrintable(c)) ? c : '~');
-        c = charset_p_topetcii(i);
-        log_msg("v:0x%02x/%c, ", c, (isPrintable(c)) ? c : '~');
-        c = ascToPetcii(i);
-        log_msg("z:0x%02x/%c, ", c, (isPrintable(c)) ? c : '~');
-        log_msg("\n");
-    }
-
-    while (true)
-        delay(1000);
 }
 
 void loop()
@@ -273,5 +267,20 @@ void terminal(void)
     }
     delay(5);
     return;
+}
+
+void dump_chars(void)
+{
+    for (int i = 0; i < 256; i++)
+    {
+        char c;
+        c = i;
+        log_msg("a:0x%02x/%c, ", c, (isPrintable(c)) ? c : '~');
+        c = charset_p_topetcii(i);
+        log_msg("v:0x%02x/%c, ", c, (isPrintable(c)) ? c : '~');
+        c = ascToPetcii(i);
+        log_msg("z:0x%02x/%c, ", c, (isPrintable(c)) ? c : '~');
+        log_msg("\n");
+    }
 }
 #endif

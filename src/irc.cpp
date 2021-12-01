@@ -64,7 +64,7 @@ static void dummy_server(void *p)
     while (true)
     {
         P(mutex);
-        msgs.push_back(String{"Dummy IRC message: @_"} + String{cnt++});
+        msgs.push_back(String{"001234567890!#$%^&*()-_Dummy IRC:"} + String{cnt++});
         V(mutex);
         delay(500 + rand() % 3000);
     }
@@ -137,7 +137,7 @@ static void _loop_irc(void)
 
 void irc_t::annotate4irc(char *s, int l)
 {
-
+    return;
     for (int i = 0; i < l; i++)
     {   
         char c = s[i];
