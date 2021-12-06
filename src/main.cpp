@@ -8,7 +8,7 @@
 
 #define TEST_FW
 #define EXT80COLS
-//#define ZIMODEM
+#define ZIMODEM
 
 pp_drv drv;
 static char buf[MAX_AUX];
@@ -59,30 +59,32 @@ uint8_t charset_p_topetcii(uint8_t c)
         return 0x0d; /* petscii "return" */
     else if (c == '\r')
         return 0x0a;
-    else if (c == '`')
+    else if ((c == '`') || (c == '\''))
         return 0x27; /* petscii "'" */
     else if (c == '@')
-        return 0;
+        return 0x40;
     else if (c == '_')
-        return 0x64;
+        return 0xa4;        // was 0x64
     else if ((c == '{') || (c == '['))
-        return 0x1b;
+        return 0x5b;        // was 0x1b
     else if ((c == '}') || (c == ']'))
-        return 0x1d;
+        return 0x5d;        // was 0x1d
     else if (c == '|')
-        return 0x5d;
+        return 0xdd;        // was 0xdd
     else if (c == '\\')
-        return 0x5d;
+        return 0x5c;    // 0x5d
+    else if (c == '/')
+        return 0x2f;
     else if (c == '~')
-        return 0x1f;
+        return 0x5e;    // was 0x1f
     else if (c == '^')
-        return 0x1e;
+        return 0x5e;        // was 1e
     else if ((c >= 'a') && (c <= 'z'))
     {
         /* lowercase (petscii 0x41 -) */
 #ifdef EXT80COLS
-    char c1 = (c - 'a') + 1;
-    log_msg("lowercase ret: '%c'/0x%02x\n", (isPrintable(c1)?c1:'~'), c1);
+    char c1 = (c - 'a') + 0x41;
+    //log_msg("lowercase ret: '%c'/0x%02x\n", (isPrintable(c1)?c1:'~'), c1);
     return c1;
 #else
         return (uint8_t)((c - 'a') + 1);
@@ -93,8 +95,8 @@ uint8_t charset_p_topetcii(uint8_t c)
         /* uppercase (petscii 0xc1 -)
            (don't use duplicate codes 0x61 - ) */
 #ifdef EXT80COLS
-    char c1 = c + 0x20;
-    log_msg("Uppercas ret: '%c'/0x%02x\n", (isPrintable(c1)?c1:'~'), c1);
+    char c1 = (c - 'A') + 0xc1;
+    //log_msg("Uppercas ret: '%c'/0x%02x\n", (isPrintable(c1)?c1:'~'), c1);
     return c1;
 #else
         return c; //(uint8_t)((c + 0x20));
@@ -133,17 +135,17 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
         //log_msg("before conv: 0x%02x\n", c);
         /* convert ctrl chars to "screencodes" (used by monitor) */
         if (c == 0x64)
-            c = 95; // underline '_'
+            return c = 95; // underline '_'
         if (c == 0x1c)
-            c = 35; // pound sign
+            return c = 35; // pound sign
         if (c == 0x1e)
-            c = 94; // arrow up
+            return c = 94; // arrow up
         if (c == 0x1f)
-            c = 60; // arrow left mapped to '<'
+            return c = 60; // arrow left mapped to '<'
         if ((c >= 0x41) && (c <= 0x5a))
-            c += 0x20;
-        if (c <= 0x1f)
-            c += 0x40;
+            return c + 0x20;
+        //if (c <= 0x1f)
+        //    c += 0x40;
     }
     //log_msg("before dupes: 0x%02x\n", c);
     c = petcii_fix_dupes(c);

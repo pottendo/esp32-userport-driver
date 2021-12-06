@@ -165,6 +165,9 @@ pp_drv::pp_drv(uint16_t qs, uint16_t bs)
     s1_queue = xQueueCreate(1, sizeof(int8_t));
     s2_queue = xQueueCreate(1, sizeof(int8_t));
     active_drv = this;
+
+    pinMode(OE, OUTPUT);
+    digitalWrite(OE, HIGH);
 }
 
 pp_drv::~pp_drv()
@@ -261,7 +264,16 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
         if (!ring_buf.get(c, block))
             return -1;
         buf[count++] = c;
-        //log_msg("rcv: 0x%02x/'%c'\n", c, (isPrintable(c)?c:'~'));
+#if 0
+        log_msg("rcv: 0x%02x/'%c'/", c, (isPrintable(c)?c:'~'));
+        for (int i = 0; i < 8; i++)
+        {
+            if ((c & (1 << i)) != 0)
+                log_msg("1");
+            else log_msg("0");
+        }
+        log_msg("\n");
+#endif
         len--;
     }
     return count;

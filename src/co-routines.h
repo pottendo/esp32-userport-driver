@@ -36,7 +36,7 @@ public:
 
     bool match(char *cmd, pp_drv *drv)
     {
-        log_msg("cmd %s vs. %s\n", cmd, name);
+        //log_msg("cmd %s vs. %s\n", cmd, name);
         if (strncmp(cmd, name.c_str(), 4) == 0)
             return run(drv);
         return false;

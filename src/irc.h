@@ -3,7 +3,7 @@
 
 #include "parport-drv.h"
 
-#define TEST_IRC
+//#define TEST_IRC
 
 class irc_t
 {

@@ -29,9 +29,11 @@ class pp_drv
         _PA2,
         _PC2,
         _SP2,
-        _FLAG
+        _FLAG,
+        _OE
     } par_pins_t;
-    const uint8_t par_pins[12] = {13, 4, 16, 17, 5, 18, 19, 22, 23, 21, 27, 15};
+//    const uint8_t par_pins[13] = {13, 4, 16, 17, 5, 18, 19, 32 /*22*/, 23, 25 /*21*/, 27, 15, 26};
+    const uint8_t par_pins[13] = {32, 19, 18, 5, 17, 16, 4, 13, 23, 25 /*21*/, 27, 15, 26};
     QueueHandle_t rx_queue;
     QueueHandle_t tx_queue;
     QueueHandle_t s1_queue;
@@ -54,6 +56,7 @@ class pp_drv
 #define PC2 PAR(_PC2)
 #define SP2 PAR(_SP2)
 #define FLAG PAR(_FLAG)
+#define OE PAR(_OE)
 
 protected:
     static void th_wrapper1(void *t);

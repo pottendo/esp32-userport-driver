@@ -64,7 +64,7 @@ static void dummy_server(void *p)
     while (true)
     {
         P(mutex);
-        msgs.push_back(String{"001234567890!#$%^&*()-_Dummy IRC:"} + String{cnt++});
+        msgs.push_back(String{"001234567890!#$%^&*()<>{}[]\\=+,.;'\"@~?/-_Dummy IRC:"} + String{cnt++});
         V(mutex);
         delay(500 + rand() % 3000);
     }
@@ -163,12 +163,12 @@ bool irc_t::loop(pp_drv &drv)
         int it, i = 0, e = s.length();
         while (i < e)
         {
-            it = ((i + 77) < e) ? (i + 77) : e;
+            it = ((i + 70) < e) ? (i + 70) : e;
             String t = s.substring(i, it);
             log_msg("\t'%s'\n", t.c_str());
             if ((e - i) <= 0)
                 break;
-            i += 77;
+            i += 70;
             ibuf[0] = t.length();
             string2petscii(ibuf + 1, t.c_str());
             annotate4irc(ibuf+1, ibuf[0]);
@@ -185,7 +185,7 @@ bool irc_t::loop(pp_drv &drv)
                 log_msg("data write error: %d\n", ret);
             }
             //log_msg("...and data\n");
-            delay(100);
+            delay(200);
         }
     }
     if (drv.available() > 0)
