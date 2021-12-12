@@ -72,7 +72,15 @@ public:
     }
     inline bool get(T &item, bool block = true)
     {
-        P(rmutex);
+        if (!block)
+        {
+            BaseType_t res;
+            res = xSemaphoreTake(rmutex, 100 * portTICK_PERIOD_MS);
+            if (res == pdFALSE)
+                return false;
+        }
+        else
+            P(rmutex);
         if (r == w)
         {
             log_msg("ringbuffer corrupt r:%d, w:%d\n", r, w);

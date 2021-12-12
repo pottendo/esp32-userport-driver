@@ -126,7 +126,7 @@ class ZCommand : public ZMode
 
     byte CRC8(const byte *data, byte len);
 
-    void showInitMessage();
+    //void showInitMessage();
     bool readSerialStream();
     bool clearPlusProgress();
     bool checkPlusEscape();
@@ -177,6 +177,7 @@ class ZCommand : public ZMode
 
     ZCommand();
     void loadConfig();
+    void showInitMessage(); // was private
 
     FlowControlType getFlowControlType();
     int getConfigFlagBitmap();

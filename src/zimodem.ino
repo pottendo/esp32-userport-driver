@@ -523,13 +523,19 @@ void loop()
 #endif
 
 #ifdef PARALLEL_DRV
+
+void ziinit_modem(void)
+{
+  commandMode.showInitMessage();
+}
+
 void zisetup_parallel(void)
 {
   for (int i = 0; i < MAX_PIN_NO; i++)
     pinSupport[i] = false;
   pinSupport[PIN_FACTORY_RESET] = true;
 #ifdef MQTT
-  setup_mqtt();
+  //setup_mqtt();
 #endif
   //initSDShell();
   currMode = &commandMode;

@@ -515,9 +515,11 @@ void ZCommand::parseConfigOptions(String configArguments[])
 
 void ZCommand::loadConfig()
 {
+#ifndef PARALLEL_DRV  
   wifiConnected = false;
   if (WiFi.status() == WL_CONNECTED)
     WiFi.disconnect();
+#endif
   setConfigDefaults();
   String argv[CFG_LAST + 1];
   parseConfigOptions(argv);
@@ -545,11 +547,14 @@ void ZCommand::loadConfig()
     connectWifi(wifiSSI.c_str(), wifiPW.c_str(), staticIP, staticDNS, staticGW, staticSN);
     debugPrintf("Done connecting to %s\n", wifiSSI.c_str());
   }
-  debugPrintf("Reset start.\n");
+  debugPrintf("Reset start.");
   doResetCommand();
-  debugPrintf("Reset complete.  Init start\n");
+  debugPrintf("Reset complete.\n");
+  /*
+  debugPrintf("Init start\n");
   showInitMessage();
   debugPrintf("Init complete.\n");
+  */
 }
 
 ZResult ZCommand::doInfoCommand(int vval, uint8_t *vbuf, int vlen, bool isNumber)

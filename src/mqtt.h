@@ -1,18 +1,18 @@
 /* -*-c++-*-
- * This file is part of formicula2.
+ * This file is part of esp32-userport-driver.
  * 
- * vice-mapper is free software: you can redistribute it and/or modify
+ * FE playground is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  * 
- * vice-mapper is distributed in the hope that it will be useful,
+ * FE playground is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  * 
  * You should have received a copy of the GNU General Public License
- * along with vice-mapper.  If not, see <https://www.gnu.org/licenses/>.
+ * along with FE playground.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
 
@@ -51,6 +51,7 @@ public:
     virtual ~myMqtt() { delete client; };
 
     void set_conn_stat(conn_stat_t s) { P(mutex); conn_stat = s; V(mutex); }
+    String get_conn_stat(void);
     inline const char *get_name(void) { return name; }
     void loop(void);
     bool connected(void);
@@ -94,6 +95,9 @@ enum ZResult2
 
 void setup_mqtt(void);
 void loop_mqtt(void);
+String mqtt_get_broker(void);
+void mqtt_set_broker(String broker);
+String mqtt_get_conn_stat(void);
 ZResult2 mqtt_command(String cmd);
 myMqtt *mqtt_register_logger(void);
 bool mqtt_connect(MQTTClient *c);

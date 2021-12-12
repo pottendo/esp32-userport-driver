@@ -1,3 +1,21 @@
+/* -*-c++-*-
+ * This file is part of esp32-userport-driver.
+ *
+ * FE playground is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * FE playground is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with FE playground.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 #include <Arduino.h>
 #include <MQTT.h>
 #include <list>
@@ -33,9 +51,6 @@ static void mqtt_upstream(String &, String &);
 #define MQTT_LOG_PW "mqtt-pw"
 #endif
 
-/* doesn't work anyway, so commented out */
-//#define MQTT_MULTITHREADED
-
 void setup_mqtt(void)
 {
     mqtt_mutex = xSemaphoreCreateMutex();
@@ -49,7 +64,8 @@ void loop_mqtt()
 {
 
     std::for_each(mqtt_connections.begin(), mqtt_connections.end(),
-                  [](myMqtt *c) {
+                  [](myMqtt *c)
+                  {
                       if (c->connected())
                           c->loop();
                       else
@@ -67,6 +83,26 @@ void loop_mqtt()
     P(mqtt_mutex_mt);
     mqtt_queue.pop_front();
     V(mqtt_mutex_mt);
+}
+
+String mqtt_get_broker(void)
+{
+    return String{MQTT_LOG};
+}
+
+void mqtt_set_broker(String broker)
+{
+    log_msg("new broker requested: " + broker + '\n');
+}
+
+String mqtt_get_conn_stat(void)
+{
+    String res;
+    if (mqtt_connection)
+        res = mqtt_connection->get_conn_stat();
+    else
+        res = "unkown";
+    return res;
 }
 
 ZResult2 mqtt_command(String full_cmd)
@@ -124,7 +160,8 @@ myMqtt::myMqtt(const char *id, const char *sv, upstream_fn f, const char *n, con
     mutex = xSemaphoreCreateMutex();
     name = (n ? n : id);
     if (!f)
-        up_fn = [](String &t, String &p) { log_msg(String(client_id) + " received: " + t + ":" + p); };
+        up_fn = [](String &t, String &p)
+        { log_msg(String(client_id) + " received: " + t + ":" + p); };
     else
         up_fn = f;
     V(mutex);
@@ -160,6 +197,27 @@ static void mqtt_connect_wrapper(void *arg)
 }
 #endif
 
+String myMqtt::get_conn_stat(void)
+{
+    String res;
+    switch (conn_stat)
+    {
+    case CONN:
+        res = "connected";
+        break;
+    case NO_CONN:
+        res = "not connected";
+        break;
+    case RECONN:
+        res = "reconnecting";
+        break;
+    default:
+        res = "unknown";
+        break;
+    }
+    return res;
+}
+
 bool myMqtt::connected(void)
 {
     bool r;
@@ -172,38 +230,11 @@ bool myMqtt::connected(void)
 
 void myMqtt::reconnect(void)
 {
-#ifdef MQTT_MULTITHREADED
-    //printf("reconnect requested...%p, connstat = %d, th = %p\n", this, conn_stat, th);
-    P(mutex);
-    if ((conn_stat != CONN) &&
-        (th == nullptr))
-    {
-        int prio = uxTaskPriorityGet(nullptr);
-        printf("reconnect requested...creating task for %p, priority = %d\n", this, prio);
-        conn_stat = RECONN; /* safe as wrapped by mutex */
-        xTaskCreate(mqtt_connect_wrapper, "mqtt-conn", 4000, this, prio /*configMAX_PRIORITIES - 1*/, &th);
-    }
-    V(mutex);
-#endif
     reconnect_body();
 }
 
 void myMqtt::cleanup(void)
 {
-#ifdef MQTT_MULTITHREADED
-    P(mutex);
-    if (conn_stat == CONN && th)
-    {
-        log_msg(String(name) + " killing mqtt task... ");
-        TaskHandle_t t = th;
-        th = nullptr;
-        V(mutex);
-        vTaskDelete(t);
-        return;
-    }
-    V(mutex);
-    printf("cleanup done.\n");
-#endif
 }
 
 void myMqtt::reconnect_body(void)

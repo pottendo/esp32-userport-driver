@@ -1,3 +1,21 @@
+/* -*-c++-*-
+ * This file is part of esp32-userport-driver.
+ * 
+ * FE playground is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * FE playground is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with FE playground.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <IRCClient.h>
@@ -74,16 +92,6 @@ static void dummy_server(void *p)
 irc_t::irc_t(void)
 {
 #ifndef TEST_IRC
-    if (!WiFi.isConnected())
-    {
-        WiFi.begin(ssid, password);
-        while (WiFi.status() != WL_CONNECTED)
-        {
-            log_msg(".");
-            delay(500);
-        }
-        WiFi.printDiag(Serial);
-    }
     wclient = new WiFiClientSecure;
     wclient->setInsecure();
     iclient = new IRCClient{IRC_SERVER, IRC_PORT, *wclient};
@@ -111,6 +119,8 @@ irc_t::~irc_t()
 #ifdef TEST_IRC
     vTaskDelete(th);
 #endif
+    delete wclient;
+    delete iclient;
 }
 
 static void _loop_irc(void)
@@ -163,12 +173,12 @@ bool irc_t::loop(pp_drv &drv)
         int it, i = 0, e = s.length();
         while (i < e)
         {
-            it = ((i + 70) < e) ? (i + 70) : e;
+            it = ((i + 78) < e) ? (i + 78) : e;
             String t = s.substring(i, it);
             log_msg("\t'%s'\n", t.c_str());
             if ((e - i) <= 0)
                 break;
-            i += 70;
+            i += 78;
             ibuf[0] = t.length();
             string2petscii(ibuf + 1, t.c_str());
             annotate4irc(ibuf+1, ibuf[0]);

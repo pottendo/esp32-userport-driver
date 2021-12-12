@@ -1,9 +1,28 @@
+/* -*-c++-*-
+ * This file is part of esp32-userport-driver.
+ * 
+ * FE playground is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * FE playground is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with FE playground.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 #ifndef __CO_ROUTINES_H__
 #define __CO_ROUTINES_H__
 
 #include <list>
 #include "logger.h"
 #include "irc.h"
+#include "html.h"
 
 void setup_cr(void);
 void loop_cr(void);
@@ -38,7 +57,10 @@ public:
     {
         //log_msg("cmd %s vs. %s\n", cmd, name);
         if (strncmp(cmd, name.c_str(), 4) == 0)
+        {
+            web_send_cmd("CoRoutine#" + name);
             return run(drv);
+        }
         return false;
     };
 
@@ -72,7 +94,7 @@ public:
     bool run(pp_drv *drv) override
     {
         char c;
-        int idx = 0;
+        int idx = 0, j;
         log_msg("reading echo arg...\n");
         while (drv->read(&c, 1))
         {
@@ -82,8 +104,15 @@ public:
         }
         int ret;
         idx--;
-        log_msg("sending back.\n");
-        if ((ret = drv->write(aux_buf, idx)) != idx)
+        static char flip_buf[128];
+        j = 0;
+        for (int i = (idx - 1); i >= 0; i--)
+        {
+            flip_buf[j++] = aux_buf[i];
+        }
+        flip_buf[j] = '\0';
+        log_msg("sending back '%s'.\n", flip_buf);
+        if ((ret = drv->write(flip_buf, idx)) != idx)
             log_msg("write error: %d\n", ret);
         return true;
     }
