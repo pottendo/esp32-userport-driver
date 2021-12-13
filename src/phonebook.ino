@@ -174,3 +174,30 @@ void PhoneBookEntry::savePhonebook()
     f.close();
   }
 }
+
+String PhoneBookEntry::dumpHTMLPhonebook(void)
+{
+  static const String header{"<br><b>ZiModem Phonebook</b><br><table id=\"Table\" class='style'><tr><th>Entry No#</th><th>Address</th><th>Modifier</th><th>Notes</th></tr>"};
+	static const String tail{"</table>"};
+  static const String dl{"<br><a href=\"/zphonebook.txt\" download=\"zphonebook.txt\"><button type=\"button\">Download Phonebook</button></a>"};
+  
+  String lines{""};
+  PhoneBookEntry *phb=phonebook;
+  while(phb != null)
+  {
+    static char buf[256];
+    lines += "<tr>";
+    snprintf(buf, 256, "%d", phb->number);
+    lines += ("<td>" + String{buf} + "</td>");
+    snprintf(buf, 256, "%s", phb->address);
+    lines += ("<td>" + String{buf} + "</td>");
+    snprintf(buf, 256, "%s", phb->modifiers);
+    lines += ("<td>" + String{buf} + "</td>");
+    snprintf(buf, 256, "%s", phb->notes);
+    lines += ("<td>" + String{buf} + "</td>");
+    lines += "</tr>";
+    phb = phb->next;
+  } 
+
+  return header + lines + tail + dl;
+}

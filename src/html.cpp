@@ -26,6 +26,7 @@
 #include "misc.h"
 #include "mqtt.h"
 #include "cmd-if.h"
+#include "phonebook.h"
 
 static AutoConnect *portal;
 static WebServer *server;
@@ -35,9 +36,6 @@ static SemaphoreHandle_t web_mutex_cmds = xSemaphoreCreateMutex();
 static std::list<uint8_t> clients;
 static std::list<String, Mallocator<String>> web_cmds;
 static bool mqtton = false;
-
-static AutoConnectRadio uCmode;
-static uCmode_t cached_uCmode = uCCoRoutine;
 
 const char esp32coC64_main[] PROGMEM = R"raw(
 {
@@ -182,7 +180,7 @@ String initialize(AutoConnectAux &aux, PageArgument &args)
 	update.value = String(buf) + " FreeMem: " + String(ESP.getFreeHeap());
 
 	static const String header{"<table id=\"Table\" class='style'><tr><th>CoProc Mode</th><th>Status</th></tr>"};
-	static String uCstatus{"<tr><td><label id=\"uCmode\">unkown uCmode</label></td><td><label id=\"mdetail\">unknown detail</label></tr>"};
+	String uCstatus{"<tr><td><label id=\"uCmode\">" + get_mode_str() + "</label></td><td><label id=\"mdetail\">unknown detail</label></tr>"};
 	static const String tail{"</table>"};
 	static const String uCm{"<br><b>Coproc Mode</b><br>"
 							"<input type=\"radio\" name=\"uCmode\" id=\"uCmode_1\" value=\"CoRoutines\" checked onclick=\"_CBuCmode(1)\"><label for=\"uCmode_1\">CoRoutines</label><br>"
@@ -195,9 +193,12 @@ String initialize(AutoConnectAux &aux, PageArgument &args)
 	static const String mqttbrinput{"<input type=\"text\" id=\"MqttSv\" name=\"MqttSv\" placeholder=\"my.favorite-broker.org\""};
 	String mqttval = String(" value=\"") + mqtt_get_broker() + "\">";
 	String mqttstatus{"<label id=\"MqttStatus\">" + mqtt_get_conn_stat() + "</label>"};
+	String pb = PhoneBookEntry::dumpHTMLPhonebook();
+
 	return String(scButtonCB) + header +
 		   uCstatus + tail +
 		   uCm +
+		   pb +
 		   mqttcb_pre + mqtt_checked + mqttcb_post + mqttcommit + mqttbrinput + mqttval + mqttstatus + "<br>";
 }
 
@@ -221,26 +222,26 @@ void onMqttCB(void)
 
 void onuCmode(void)
 {
-	//log_msg("uCmode callback: %s\n", server->arg("mode").c_str());
+	// log_msg("uCmode callback: %s\n", server->arg("mode").c_str());
 	String arg = server->arg("mode");
 	uCmode_t t = static_cast<uCmode_t>(arg.toInt());
-	if (t != cached_uCmode)
+	if (t != get_mode())
 	{
-		log_msg("mode changed from %d to %d\n", cached_uCmode, t);
-		cached_uCmode = t;
-		change_mode(cached_uCmode);
+		log_msg("mode changed from %d to %d\n", get_mode(), t);
+		change_mode(t);
 	}
 	server->send(200, "text/plain", "");
 }
 
-uCmode_t web_get_uCmode(void)
+void onDownload(void)
 {
-	_FMUTEX(web_mutex_cmds);
-
-	if (!server)
-		return uCCoRoutine;
-
-	return cached_uCmode;
+	if (SPIFFS.exists("/zphonebook.txt"))
+	{
+		File f = SPIFFS.open("/zphonebook.txt", "r");
+		server->streamFile<File>(f, "text/plain");
+	}
+	else
+		server->send(200, "text/html", "<H1>Failed to open file for reading</h1>");
 }
 
 void web_send_cmd(String cmd)
@@ -266,6 +267,7 @@ void setup_html(AutoConnect *p, WebServer *s)
 	portal->aux("/")->on(initialize, AC_EXIT_AHEAD);
 	s->on("/mqtt", onMqttCB);
 	s->on("/uCmode", onuCmode);
+	s->on("/zphonebook.txt", onDownload);
 }
 
 void setup_websocket(void)

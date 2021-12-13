@@ -33,7 +33,31 @@ static char buf[MAX_AUX];
 static int ret;
 
 // protect cmd exec against async commands (web, mqtt, etc.)
-SemaphoreHandle_t cmd_mutex = xSemaphoreCreateMutex();
+static SemaphoreHandle_t cmd_mutex = xSemaphoreCreateMutex();
+
+static uCmode_t cached_uCmode = uCCoRoutine;
+uCmode_t get_mode(void)
+{
+    return cached_uCmode;
+}
+
+String get_mode_str(void)
+{
+    String str;
+    switch (get_mode())
+    {
+    case uCCoRoutine:
+        str = "CoRoutine";
+        break;
+    case uCZiModem:
+        str = "ZiModem";
+        break;
+    default:
+        str = "unknown";
+        break;
+    }
+    return str;
+}
 
 int process_cmd(char *cmd)
 {
@@ -217,18 +241,19 @@ void setup_cmd()
     setup_cr();
     delay(20);
     drv.open();
+
     zisetup_parallel();
 }
 
 void change_mode(uCmode_t mode)
 {
-    _FMUTEX(cmd_mutex);
+    //_FMUTEX(cmd_mutex);
     extern void ziinit_modem(void);
     switch (mode)
     {
     case uCZiModem:
-        web_send_cmd("ZiModem#Initializing...");
         log_msg("ZiModem init start\n");
+        web_send_cmd("ZiModem#Initializing...");
         ziinit_modem();
         log_msg("ZiModem init complete.\n");
         web_send_cmd("ZiModem#online");
@@ -241,19 +266,20 @@ void change_mode(uCmode_t mode)
         // nothing to do
         break;
     }
+    cached_uCmode = mode;
 }
 
 void loop_cmd()
 {
+    uCmode_t mode = get_mode();
     P(cmd_mutex);
-    uCmode_t mode = web_get_uCmode();
     switch (mode)
     {
     case uCZiModem:
         ziloop_parallel();
         break;
     case uCCoRoutine:
-        //log_msg("Waiting for command from c64...\n");
+        // log_msg("Waiting for command from c64...\n");
         ret = drv.read(buf, 4, false);
         if ((ret == -1) && (mode != uCCoRoutine))
         {
@@ -261,7 +287,7 @@ void loop_cmd()
             change_mode(mode);
             return;
         }
-        if (ret == 4) 
+        if (ret == 4)
         {
             buf[ret] = '\0';
             if (!process_cmd(buf))
@@ -283,10 +309,10 @@ void loop_cmd()
         }
 #endif
         break;
-        default:
-            V(cmd_mutex);
-            change_mode(uCCoRoutine);
-            return;
+    default:
+        V(cmd_mutex);
+        change_mode(uCCoRoutine);
+        return;
     }
     V(cmd_mutex);
 }

@@ -19,10 +19,11 @@
 #ifndef __CMD_IF_H__
 #define __CMD_IF_H__
 
-
 typedef enum { uCCoRoutine = 1, uCZiModem } uCmode_t;
 void setup_cmd(void);
 void loop_cmd(void);
 void change_mode(uCmode_t mode);
+uCmode_t get_mode(void);
+String get_mode_str(void);
 
 #endif

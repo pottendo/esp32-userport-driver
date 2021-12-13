@@ -20,7 +20,7 @@ class PhoneBookEntry
     const char *address;
     const char *modifiers;
     const char *notes;
-    PhoneBookEntry *next = null;
+    PhoneBookEntry *next = nullptr;
 
     PhoneBookEntry(unsigned long phnum, const char *addr, const char *mod, const char *note);
     ~PhoneBookEntry();
@@ -31,5 +31,6 @@ class PhoneBookEntry
     static bool checkPhonebookEntry(String cmd);
     static PhoneBookEntry *findPhonebookEntry(long number);
     static PhoneBookEntry *findPhonebookEntry(String number);
+    static String dumpHTMLPhonebook(void);
 };
 

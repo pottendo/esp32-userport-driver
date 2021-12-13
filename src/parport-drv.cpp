@@ -318,12 +318,19 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     if ((len == 0) || (len >= qs))
         return -1;
     setup_snd();
+    int ec = 50;
     while (digitalRead(PA2) == HIGH)
     {
         log_msg("C64 busy...\n");
         delay(100);
+        if (--ec == 0)
+        {
+            ret = -1;
+            goto out;
+        }
     }
-    unsigned long t1 = millis(), t2;
+    unsigned long t1, t2;
+    t1 = millis();
     outchar(*str);
     str++;
     len--;
@@ -334,7 +341,8 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         str++;
     }
     flag_handshake();
-    int8_t err = 0;
+    int8_t err;
+    err = 0;
     float baud;
     if (xQueueReceive(s2_queue, &err, portMAX_DELAY) == pdTRUE)
     {
