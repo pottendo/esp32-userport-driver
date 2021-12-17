@@ -164,6 +164,72 @@ function _CBuCmode(mode) {
 </script>
 )";
 
+// Upload request custom Web page
+static const char PAGE_PHONEBOOK[] PROGMEM = R"(
+{
+  "uri": "/phonebook",
+  "title": "ZiModem Phonebook",
+  "menu": false,
+  "element": [
+	{
+        "name": "tablestyle",
+        "type": "ACStyle",
+        "value": "table.style{font-family:arial,sans-serif;border-collapse:collapse;width:100%;color:black;}table.style td,table.style th{border:1px solid #dddddd;text-align:left;padding:8px;}table.style tr:nth-child(even){background-color:#dddddd;}"
+    },
+    {
+      "name": "upload",
+      "type": "ACSubmit",
+      "value": "Upload Phonebook",
+      "uri": "/upload",
+	  "post": ""
+    },
+    {
+      "name": "upload_file",
+      "type": "ACFile",
+      "label": "Select file: ",
+      "store": "fs"
+    }
+  ]
+}
+)";
+
+// Upload result display
+static const char PAGE_UPLOAD[] PROGMEM = R"(
+{
+  "uri": "/upload",
+  "title": "Phonebook upload",
+  "menu": false,
+  "element": [
+    {
+      "name": "caption",
+      "type": "ACText",
+      "value": "<h2>Uploading ended</h2>"
+    },
+    {
+      "name": "filename",
+      "type": "ACText",
+      "posterior": "br"
+    },
+    {
+      "name": "size",
+      "type": "ACText",
+      "format": "%s bytes uploaded",
+      "posterior": "br"
+    },
+    {
+      "name": "content_type",
+      "type": "ACText",
+      "format": "Content: %s",
+      "posterior": "br"
+    },
+    {
+      "name": "object",
+      "type": "ACElement"
+    }
+  ]
+}
+)";
+
 // The handler called before HTML generating
 String initialize(AutoConnectAux &aux, PageArgument &args)
 {
@@ -186,6 +252,7 @@ String initialize(AutoConnectAux &aux, PageArgument &args)
 							"<input type=\"radio\" name=\"uCmode\" id=\"uCmode_1\" value=\"CoRoutines\" checked onclick=\"_CBuCmode(1)\"><label for=\"uCmode_1\">CoRoutines</label><br>"
 							"<input type=\"radio\" name=\"uCmode\" id=\"uCmode_2\" value=\"ZiModem\" onclick=\"_CBuCmode(2)\"><label for=\"uCmode_2\">ZiModem</label><br>"};
 
+	static const String mpb{"<input type=\"button\" value=\"Phonebook\" onclick=\"_sa('phonebook')\">"};
 	static const String mqttcb_pre{"<br><b>MQTT Control</b><br><input type=\"checkbox\" id=\"mqttcb\" name=\"mqttcbox\" onchange=\"_MqttCB(this)\""};
 	String mqtt_checked = mqtton ? " checked" : "";
 	static const String mqttcb_post{"><label for=\"mqttbox\">MQTT Output</label>"};
@@ -193,12 +260,11 @@ String initialize(AutoConnectAux &aux, PageArgument &args)
 	static const String mqttbrinput{"<input type=\"text\" id=\"MqttSv\" name=\"MqttSv\" placeholder=\"my.favorite-broker.org\""};
 	String mqttval = String(" value=\"") + mqtt_get_broker() + "\">";
 	String mqttstatus{"<label id=\"MqttStatus\">" + mqtt_get_conn_stat() + "</label>"};
-	String pb = PhoneBookEntry::dumpHTMLPhonebook();
-
+	
 	return String(scButtonCB) + header +
 		   uCstatus + tail +
 		   uCm +
-		   pb +
+		   mpb +
 		   mqttcb_pre + mqtt_checked + mqttcb_post + mqttcommit + mqttbrinput + mqttval + mqttstatus + "<br>";
 }
 
@@ -259,6 +325,40 @@ void web_send_cmd(String cmd)
 	// mqtt_publish_mt("/web-command", cmd);
 }
 
+AutoConnectAux auxUpload;
+AutoConnectAux auxPhoneBook;
+
+String prep_phonebook(AutoConnectAux &aux, PageArgument &args)
+{
+	String pb = PhoneBookEntry::dumpHTMLPhonebook();
+	return pb;
+}
+
+String postUpload(AutoConnectAux &aux, PageArgument &args)
+{
+	String content;
+	// Explicitly cast to the desired element to correctly extract
+	// the element using the operator [].
+	AutoConnectFile &upload = auxUpload["upload_file"].as<AutoConnectFile>();
+	AutoConnectText &aux_filename = aux["filename"].as<AutoConnectText>();
+	AutoConnectText &aux_size = aux["size"].as<AutoConnectText>();
+	AutoConnectText &aux_contentType = aux["content_type"].as<AutoConnectText>();
+	// Assignment operator can be used for the element attribute.
+	aux_filename.value = upload.value;
+	Serial.printf("uploaded file saved as %s\n", aux_filename.value.c_str());
+	aux_size.value = String(upload.size);
+	aux_contentType.value = upload.mimeType;
+
+	// Include the uploaded content in the object tag to provide feedback
+	// in case of success.
+	String uploadFileName = String("/") + aux_filename.value;
+  	if (SPIFFS.exists(uploadFileName.c_str()))
+    	auxPhoneBook["object"].value = String("<object data=\"") + uploadFileName + String("\"></object>");
+  	else
+	    auxPhoneBook["object"].value = "Not saved";
+	return String();
+}
+
 void setup_html(AutoConnect *p, WebServer *s)
 {
 	portal = p;
@@ -268,6 +368,13 @@ void setup_html(AutoConnect *p, WebServer *s)
 	s->on("/mqtt", onMqttCB);
 	s->on("/uCmode", onuCmode);
 	s->on("/zphonebook.txt", onDownload);
+	  // Attach the custom web pages
+  	auxUpload.load(PAGE_PHONEBOOK);
+	auxUpload.on(prep_phonebook, AC_EXIT_AHEAD);
+  	auxPhoneBook.load(PAGE_UPLOAD);
+    auxPhoneBook.on(postUpload);  
+  	portal->join({ auxUpload, auxPhoneBook });
+
 }
 
 void setup_websocket(void)
