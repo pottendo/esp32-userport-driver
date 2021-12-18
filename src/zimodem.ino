@@ -160,10 +160,6 @@ public:
 #include "zconfigmode.h"
 #include "zprint.h"
 
-#ifdef MQTT
-#include "mqtt.h"
-#endif
-
 #ifdef INCLUDE_SD_SHELL
 #include "proto_xmodem.h"
 #include "proto_zmodem.h"
@@ -526,6 +522,8 @@ void loop()
 
 void ziinit_modem(void)
 {
+  hostname = String{WiFi.getHostname()};
+  wifiSSI = WiFi.SSID();
   commandMode.showInitMessage();
 }
 
@@ -534,9 +532,6 @@ void zisetup_parallel(void)
   for (int i = 0; i < MAX_PIN_NO; i++)
     pinSupport[i] = false;
   pinSupport[PIN_FACTORY_RESET] = true;
-#ifdef MQTT
-  //setup_mqtt();
-#endif
   //initSDShell();
   currMode = &commandMode;
   if (!SPIFFS.begin())
@@ -563,9 +558,6 @@ void ziloop_parallel()
   }
   currMode->loop();
   zclock.tick();
-#ifdef MQTT
-  //loop_mqtt();
-#endif
 }
 
 #endif /* PARALLEL_DRV */

@@ -27,6 +27,10 @@
 #include "wifi.h"
 #include "html.h"
 
+#ifdef MQTT
+#include "mqtt.h"
+#endif
+
 // Wifi gets his own task
 static TaskHandle_t wifi_th;
 
@@ -105,6 +109,9 @@ void setup_wifi(void)
     {
         log_msg("Setup of DNS for fcc failed.\n");
     }
+#ifdef MQTT
+    setup_mqtt();
+#endif
 
     xTaskCreate(wifi_task, "Wifi-task", 4096, nullptr, uxTaskPriorityGet(nullptr), &wifi_th);
 }
@@ -120,5 +127,9 @@ void loop_wifi(void)
     loop_websocket();
     portal.handleClient();
     loop_log();
+#ifdef MQTT
+    loop_mqtt();
+#endif
+
     delay(50);
 }

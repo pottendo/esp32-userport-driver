@@ -98,7 +98,7 @@ void loop_mqtt(void);
 String mqtt_get_broker(void);
 void mqtt_set_broker(String broker);
 String mqtt_get_conn_stat(void);
-ZResult2 mqtt_command(String cmd);
+ZResult2 mqtt_command(String &cmd);
 myMqtt *mqtt_register_logger(void);
 bool mqtt_connect(MQTTClient *c);
 void mqtt_publish(String topic, String msg, myMqtt *c = nullptr, int qos = 0);

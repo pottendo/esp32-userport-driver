@@ -25,5 +25,11 @@ void loop_cmd(void);
 void change_mode(uCmode_t mode);
 uCmode_t get_mode(void);
 String get_mode_str(void);
+void mqtt_cmd(String &cmd);
+
+uint8_t charset_p_topetcii(uint8_t c);
+uint8_t charset_p_toascii(uint8_t c, int cs);
+typedef enum { ASCII2PETSCII, PETSCII2ASCII } char_conv_t;
+void string2Xscii(char *buf, const char *str, char_conv_t dir);
 
 #endif

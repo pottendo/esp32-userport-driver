@@ -165,12 +165,14 @@ uint8_t charset_p_topetcii(uint8_t c)
     return petcii_fix_dupes(c);
 }
 
-void string2petscii(char *buf, const char *str)
+void string2Xscii(char *buf, const char *str, char_conv_t dir)
 {
     int i = 0;
     while (*str)
     {
-        buf[i++] = charset_p_topetcii(*str); // ascToPetcii(*str);
+        buf[i++] = (dir == ASCII2PETSCII) ? 
+                        charset_p_topetcii(*str) :
+                        charset_p_toascii(*str, false); 
         str++;
     }
     buf[i] = '\0';
@@ -182,7 +184,7 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
 {
     if (cs)
     {
-        // log_msg("before conv: 0x%02x\n", c);
+        //log_msg("before conv: 0x%02x\n", c);
         /* convert ctrl chars to "screencodes" (used by monitor) */
         if (c == 0x64)
             return c = 95; // underline '_'
@@ -197,9 +199,9 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
         // if (c <= 0x1f)
         //     c += 0x40;
     }
-    // log_msg("before dupes: 0x%02x\n", c);
+    //log_msg("before dupes: 0x%02x\n", c);
     c = petcii_fix_dupes(c);
-    // log_msg("after dupes: 0x%02x\n", c);
+    //log_msg("after dupes: 0x%02x\n", c);
     /* map petscii to ascii */
     if (c == 0x0d)
     { /* petscii "return" */
@@ -236,15 +238,6 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
 void zisetup_parallel(void);
 void ziloop_parallel(void);
 
-void setup_cmd()
-{
-    setup_cr();
-    delay(20);
-    drv.open();
-
-    zisetup_parallel();
-}
-
 void change_mode(uCmode_t mode)
 {
     //_FMUTEX(cmd_mutex);
@@ -267,6 +260,29 @@ void change_mode(uCmode_t mode)
         break;
     }
     cached_uCmode = mode;
+}
+
+void mqtt_cmd(String &cmd)
+{
+    if (cmd == "co")
+    {
+        log_msg("mqtt reqeuests CoRoutines...");
+        change_mode(uCCoRoutine);
+    }
+    if (cmd == "zi")
+    {
+        log_msg("mqtt reqeuests ZiModem...");
+        change_mode(uCZiModem);
+    }
+}
+
+void setup_cmd()
+{
+    setup_cr();
+    delay(20);
+    drv.open();
+
+    zisetup_parallel();
 }
 
 void loop_cmd()
@@ -330,7 +346,7 @@ void terminal(void)
             buf[0] = idx - 2;
             buf[idx--] = '\0';
             // log_msg("sending: '%s', len = %d\n", buf+1, buf[0]);
-            string2petscii(buf + 1, buf + 1);
+            string2Xscii(buf + 1, buf + 1, ASCII2PETSCII);
 
             drv.sync4write();
             // log_msg("synced for write... writing %d byte...\n", idx);

@@ -109,7 +109,5 @@ public:
     }
 };
 
-uint8_t charset_p_topetcii(uint8_t c);
-uint8_t charset_p_toascii(uint8_t c, int cs);
-void string2petscii(char *buf, const char *str);
+
 #endif

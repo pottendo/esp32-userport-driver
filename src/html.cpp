@@ -250,7 +250,7 @@ String initialize(AutoConnectAux &aux, PageArgument &args)
 	static const String tail{"</table>"};
 	static const String uCm{"<br><b>Coproc Mode</b><br>"
 							"<input type=\"radio\" name=\"uCmode\" id=\"uCmode_1\" value=\"CoRoutines\" checked onclick=\"_CBuCmode(1)\"><label for=\"uCmode_1\">CoRoutines</label><br>"
-							"<input type=\"radio\" name=\"uCmode\" id=\"uCmode_2\" value=\"ZiModem\" onclick=\"_CBuCmode(2)\"><label for=\"uCmode_2\">ZiModem</label><br>"};
+							"<input type=\"radio\" name=\"uCmode\" id=\"uCmode_2\" value=\"ZiModem\" onclick=\"_CBuCmode(2)\"><label for=\"uCmode_2\">ZiModem</label>"};
 
 	static const String mpb{"<input type=\"button\" value=\"Phonebook\" onclick=\"_sa('phonebook')\">"};
 	static const String mqttcb_pre{"<br><b>MQTT Control</b><br><input type=\"checkbox\" id=\"mqttcb\" name=\"mqttcbox\" onchange=\"_MqttCB(this)\""};
@@ -260,7 +260,7 @@ String initialize(AutoConnectAux &aux, PageArgument &args)
 	static const String mqttbrinput{"<input type=\"text\" id=\"MqttSv\" name=\"MqttSv\" placeholder=\"my.favorite-broker.org\""};
 	String mqttval = String(" value=\"") + mqtt_get_broker() + "\">";
 	String mqttstatus{"<label id=\"MqttStatus\">" + mqtt_get_conn_stat() + "</label>"};
-	
+
 	return String(scButtonCB) + header +
 		   uCstatus + tail +
 		   uCm +
@@ -325,8 +325,8 @@ void web_send_cmd(String cmd)
 	// mqtt_publish_mt("/web-command", cmd);
 }
 
-AutoConnectAux auxUpload;
-AutoConnectAux auxPhoneBook;
+static AutoConnectAux auxUpload;
+static AutoConnectAux auxPhoneBook;
 
 String prep_phonebook(AutoConnectAux &aux, PageArgument &args)
 {
@@ -352,10 +352,13 @@ String postUpload(AutoConnectAux &aux, PageArgument &args)
 	// Include the uploaded content in the object tag to provide feedback
 	// in case of success.
 	String uploadFileName = String("/") + aux_filename.value;
-  	if (SPIFFS.exists(uploadFileName.c_str()))
-    	auxPhoneBook["object"].value = String("<object data=\"") + uploadFileName + String("\"></object>");
-  	else
-	    auxPhoneBook["object"].value = "Not saved";
+	if (SPIFFS.exists(uploadFileName.c_str()))
+	{
+		auxPhoneBook["object"].value = String("<object data=\"") + uploadFileName + String("\"></object>");
+		PhoneBookEntry::loadPhonebook();
+	}
+	else
+		auxPhoneBook["object"].value = "Not saved";
 	return String();
 }
 
@@ -368,13 +371,12 @@ void setup_html(AutoConnect *p, WebServer *s)
 	s->on("/mqtt", onMqttCB);
 	s->on("/uCmode", onuCmode);
 	s->on("/zphonebook.txt", onDownload);
-	  // Attach the custom web pages
-  	auxUpload.load(PAGE_PHONEBOOK);
+	// Attach the custom web pages for phonebook
+	auxUpload.load(PAGE_PHONEBOOK);
 	auxUpload.on(prep_phonebook, AC_EXIT_AHEAD);
-  	auxPhoneBook.load(PAGE_UPLOAD);
-    auxPhoneBook.on(postUpload);  
-  	portal->join({ auxUpload, auxPhoneBook });
-
+	auxPhoneBook.load(PAGE_UPLOAD);
+	auxPhoneBook.on(postUpload);
+	portal->join({auxUpload, auxPhoneBook});
 }
 
 void setup_websocket(void)

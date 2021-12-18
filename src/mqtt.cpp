@@ -24,6 +24,7 @@
 #include "logger.h"
 
 #include "mqtt.h"
+#include "cmd-if.h"
 
 static myMqtt *mqtt_connection;
 static SemaphoreHandle_t mqtt_mutex; /* ensure exclusive access to mqtt client lib */
@@ -38,7 +39,7 @@ typedef struct
 static std::list<mqpub_t> mqtt_queue;
 static std::list<myMqtt *> mqtt_connections;
 
-static const char *client_id = "c64esp32modem"; /* identify fcc uniquely on mqtt */
+static const char *client_id = "c64esp32modem"; /* identify c64 uniquely on mqtt */
 static void mqtt_upstream(String &, String &);
 
 /* embedded device name local broker on network*/
@@ -105,14 +106,18 @@ String mqtt_get_conn_stat(void)
     return res;
 }
 
-ZResult2 mqtt_command(String full_cmd)
+ZResult2 mqtt_command(String &full_cmd)
 {
-    String cmd = full_cmd.substring(6, full_cmd.length());
+    static char buf[256];
+    String cmd = full_cmd.substring(6, full_cmd.length());  // full cmd: 'ATMQTTcmd&topic&msg
     int i1 = cmd.indexOf('&');
     int i2 = cmd.indexOf('&', i1 + 1);
-    String c = cmd.substring(0, i1);
-    String topic = cmd.substring(i1 + 1, i2);
-    String m = cmd.substring(i2 + 1, cmd.length());
+    string2Xscii(buf, cmd.substring(0, i1).c_str(), PETSCII2ASCII);
+    String c = String{buf};
+    string2Xscii(buf, cmd.substring(i1 + 1, i2).c_str(), PETSCII2ASCII);
+    String topic = String{buf};
+    string2Xscii(buf, cmd.substring(i2 + 1, cmd.length()).c_str(), PETSCII2ASCII);
+    String m = String{buf};
     log_msg("mqtt command issued: '%s' topic: '%s', msg: '%s'\n", c.c_str(), topic.c_str(), m.c_str());
     mqtt_publish(topic, m);
 
@@ -179,24 +184,6 @@ void myMqtt::loop(void)
     V(mutex);
 }
 
-#ifdef MQTT_MULTITHREADED
-static void mqtt_connect_wrapper(void *arg)
-{
-    myMqtt *p = static_cast<myMqtt *>(arg);
-    log_msg(String(p->get_name()) + "mqtt connection task launched...");
-    while (!p->connected())
-    {
-        p->reconnect_body();
-    }
-    log_msg(String(p->get_name()) + "mqtt connection task wating to be killed.");
-    while (1)
-    {
-        delay(1000); /* wait to be killed */
-        p->cleanup();
-    }
-}
-#endif
-
 String myMqtt::get_conn_stat(void)
 {
     String res;
@@ -255,18 +242,18 @@ void myMqtt::reconnect_body(void)
         connection_wd = millis();
     last = millis();
     reconnects++;
-    log_msg("fe-play not connected, attempting MQTT connection..." + String(reconnects));
+    log_msg("mqtt broker not connected, attempting MQTT connection..." + String(reconnects) + '\n');
 
     // Attempt to connect
     if (connect())
     {
         reconnects = 0;
         connection_wd = 0;
-        log_msg("fe-play connected to %s.\n", server);
+        log_msg("mqtt connected to %s.\n", server);
         P(mutex);
-        client->subscribe("fe-play/#", 0);
+        client->subscribe("c64/ctrl/#", 0);
         V(mutex);
-        mqtt_publish("/fe-play", "FE playground - aloha...", this);
+        mqtt_publish("c64/log", "C64 resurrected - aloha...", this);
         set_conn_stat(CONN);
     }
     else
@@ -364,5 +351,8 @@ bool myMqttLocal::connect(void)
 
 static void mqtt_upstream(String &t, String &payload)
 {
-    log_msg(String("mqtt upstream not implemented for ") + t + ":" + payload);
+    if (t == "c64/ctrl")
+        mqtt_cmd(payload);
+    else
+        log_msg("mqtt unsupported topic %s\n", t.c_str());
 }

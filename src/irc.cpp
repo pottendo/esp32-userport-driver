@@ -25,7 +25,7 @@
 #include "cred.h"
 #include "misc.h"
 #include "pet2asc.h"
-
+#include "cmd-if.h"
 static SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
 static std::list<String> msgs;
 
@@ -180,7 +180,7 @@ bool irc_t::loop(pp_drv &drv)
                 break;
             i += 78;
             ibuf[0] = t.length();
-            string2petscii(ibuf + 1, t.c_str());
+            string2Xscii(ibuf + 1, t.c_str(), ASCII2PETSCII);
             annotate4irc(ibuf+1, ibuf[0]);
             drv.sync4write();
             //log_msg("synced for write... writing %d byte...\n", ibuf[0] + 1);
