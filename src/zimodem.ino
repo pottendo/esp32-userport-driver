@@ -522,8 +522,14 @@ void loop()
 
 void ziinit_modem(void)
 {
+  if (!WiFi.isConnected())
+  {
+    log_msg("ZiModem rejected, missing WiFi.\n");
+    return; 
+  }
   hostname = String{WiFi.getHostname()};
   wifiSSI = WiFi.SSID();
+  wifiConnected = true;
   commandMode.showInitMessage();
 }
 

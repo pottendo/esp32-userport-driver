@@ -74,15 +74,22 @@ bool irc_t::get_msg(String &s)
 }
 
 #ifdef TEST_IRC
+static String test_str{"0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"};
+
 static void dummy_server(void *p)
 {
+    static int msglen[10] = {5, 10, 70, 78, 79, 80, 81, 82, 100, 120};
+    static int idx = 0;
     log_msg("IRC dummy server started...\n");
     int cnt = 0;
     srand(millis());
     while (true)
     {
         P(mutex);
-        msgs.push_back(String{"001234567890!#$%^&*()<>{}[]\\=+,.;'\"@~?/-_Dummy IRC:"} + String{cnt++});
+        static char buf[140];
+        snprintf(buf, 140, "%03d %s", msglen[idx], test_str.substring(4, msglen[idx]).c_str());
+        msgs.push_back(String{buf});
+        if (++idx > 9) idx = 0;
         V(mutex);
         delay(500 + rand() % 3000);
     }
@@ -118,9 +125,10 @@ irc_t::~irc_t()
 {
 #ifdef TEST_IRC
     vTaskDelete(th);
-#endif
+#else
     delete wclient;
     delete iclient;
+#endif
 }
 
 static void _loop_irc(void)
@@ -173,17 +181,17 @@ bool irc_t::loop(pp_drv &drv)
         int it, i = 0, e = s.length();
         while (i < e)
         {
-            it = ((i + 78) < e) ? (i + 78) : e;
+            it = ((i + 80) < e) ? (i + 80) : e;
             String t = s.substring(i, it);
             log_msg("\t'%s'\n", t.c_str());
             if ((e - i) <= 0)
                 break;
-            i += 78;
+            i += 80;
             ibuf[0] = t.length();
             string2Xscii(ibuf + 1, t.c_str(), ASCII2PETSCII);
             annotate4irc(ibuf+1, ibuf[0]);
             drv.sync4write();
-            //log_msg("synced for write... writing %d byte...\n", ibuf[0] + 1);
+            log_msg("synced for write... msglen = %d...\n", ibuf[0]);
             if ((ret = drv.write(ibuf, 1)) != 1)
             {
                 log_msg("len write error: %d\n", ret);
@@ -219,7 +227,7 @@ bool irc_t::loop(pp_drv &drv)
                 if (strcmp(buf, "*qui*") == 0)
                     return false;
 #ifndef TEST_IRC
-                iclient->sendMessage("pottendo" /*IRC_CHANNEL*/, String{buf});
+                iclient->sendMessage(/*"pottendo"*/ IRC_CHANNEL, String{buf});
 #endif
                 idx = 0;
                 break;
