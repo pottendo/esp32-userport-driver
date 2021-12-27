@@ -1,16 +1,16 @@
 /* -*-c++-*-
  * This file is part of esp32-userport-driver.
- * 
+ *
  * FE playground is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * FE playground is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with FE playground.  If not, see <https://www.gnu.org/licenses/>.
  *
@@ -20,6 +20,7 @@
 #include <WiFiClientSecure.h>
 #include <IRCClient.h>
 #include <list>
+#include <map>
 #include "irc.h"
 #include "logger.h"
 #include "cred.h"
@@ -47,7 +48,7 @@ static void callback(IRCMessage ircMessage)
         V(mutex);
         return;
     }
-    //log_msg(ircMessage.original + '\n');
+    // log_msg(ircMessage.original + '\n');
     msgs.push_back(ircMessage.original);
 }
 
@@ -87,9 +88,10 @@ static void dummy_server(void *p)
     {
         P(mutex);
         static char buf[140];
-        snprintf(buf, 140, "%03d %s", msglen[idx], test_str.substring(4, msglen[idx]).c_str());
+        snprintf(buf, 140, "%cbla>%c-%03d %s", 254, 254, msglen[idx], test_str.substring(11, msglen[idx]).c_str());
         msgs.push_back(String{buf});
-        if (++idx > 9) idx = 0;
+        if (++idx > 9)
+            idx = 0;
         V(mutex);
         delay(500 + rand() % 3000);
     }
@@ -153,18 +155,25 @@ static void _loop_irc(void)
 #endif
 }
 
-void irc_t::annotate4irc(char *s, int l)
+static std::map<String, int> nick2col;
+
+void irc_t::annotate4irc(String &s)
 {
-    return;
-    for (int i = 0; i < l; i++)
-    {   
-        char c = s[i];
-        if ((c == ' ') || (c == '>'))
-            break;
-        if ((c >= 'A') && (c <= 'Z'))
-            s[i] |= 0x80;
-        if ((c >= 'a') && (c <= 'z'))
-            s[i] |= 0x80;
+    static int cols[8] = {253, 252, 251, 250};
+    static int next_colidx = 0;
+    int col;
+
+    int idx = s.indexOf('>');
+    if (idx > 0)
+    {
+        String nick = s.substring(0, idx);
+        auto n = nick2col.find(nick);
+        if (n != nick2col.end())
+            col = (*n).second;
+        else
+            col = nick2col[nick] = cols[(++next_colidx) % 4];
+        s = String{static_cast<char>(col)} + String{static_cast<char>(254)} + nick + String{static_cast<char>(254)} +
+            s.substring(idx, s.length()); // wrap with ctrl char 254 -> revers on
     }
 }
 
@@ -178,6 +187,7 @@ bool irc_t::loop(pp_drv &drv)
         static char ibuf[128];
         String t;
         log_msg("IRC msg '%s' len: %d\n", s.c_str(), s.length());
+        annotate4irc(s);
         int it, i = 0, e = s.length();
         while (i < e)
         {
@@ -189,20 +199,19 @@ bool irc_t::loop(pp_drv &drv)
             i += 80;
             ibuf[0] = t.length();
             string2Xscii(ibuf + 1, t.c_str(), ASCII2PETSCII);
-            annotate4irc(ibuf+1, ibuf[0]);
             drv.sync4write();
             log_msg("synced for write... msglen = %d...\n", ibuf[0]);
             if ((ret = drv.write(ibuf, 1)) != 1)
             {
                 log_msg("len write error: %d\n", ret);
             }
-            //log_msg("...wrote length...\n");
-            //delay(1000);
+            // log_msg("...wrote length...\n");
+            // delay(1000);
             if ((ret = drv.write(ibuf + 1, ibuf[0])) != ibuf[0])
             {
                 log_msg("data write error: %d\n", ret);
             }
-            //log_msg("...and data\n");
+            // log_msg("...and data\n");
             delay(200);
         }
     }

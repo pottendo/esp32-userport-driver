@@ -155,6 +155,8 @@ uint8_t charset_p_topetcii(uint8_t c)
     else if (c <= 0x1f)
         /* unhandled ctrl codes */
         return '.';
+    else if ((c >= 250) && (c <= 254))
+        return c;   // control chars (for IRC)
     else if (c >= 0x7b)
     {
         /* last not least, ascii codes >= 0x7b can not be
