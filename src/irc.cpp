@@ -63,23 +63,13 @@ static void send_msg(String s)
 }
 #endif /* TEST_IRC */
 
-bool irc_t::get_msg(String &s)
-{
-    _FMUTEX(mutex);
-    if (msgs.size() == 0)
-        return false;
-
-    s = msgs.front();
-    msgs.pop_front();
-    return true;
-}
-
 #ifdef TEST_IRC
-static String test_str{"0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"};
+static String test_str{"1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"};
+static irc_t *li;
 
 static void dummy_server(void *p)
 {
-    static int msglen[10] = {5, 10, 70, 78, 79, 80, 81, 82, 100, 120};
+    static int msglen[10] = {15, 70, 77, 78, 79, 80, 81, 82, 100, 120};
     static int idx = 0;
     log_msg("IRC dummy server started...\n");
     int cnt = 0;
@@ -88,15 +78,18 @@ static void dummy_server(void *p)
     {
         P(mutex);
         static char buf[140];
-        snprintf(buf, 140, "%cbla>%c-%03d %s", 254, 254, msglen[idx], test_str.substring(11, msglen[idx]).c_str());
+        snprintf(buf, 140, "bla%03d-%03d> %s", li->get_nextcol(), msglen[idx], test_str.substring(12, msglen[idx]).c_str());
         msgs.push_back(String{buf});
         if (++idx > 9)
             idx = 0;
+        
         V(mutex);
         delay(500 + rand() % 3000);
     }
 }
 #endif
+int irc_t::cols[num_cols] = {253, 252, 251, 250};
+int irc_t::next_colidx = 0;
 
 irc_t::irc_t(void)
 {
@@ -119,6 +112,7 @@ irc_t::irc_t(void)
     }
     iclient->sendRaw("JOIN " + String{IRC_CHANNEL});
 #else
+    li = this;
     xTaskCreate(dummy_server, "IRC Fake", 4000, nullptr, uxTaskPriorityGet(nullptr), &th);
 #endif
 }
@@ -159,8 +153,6 @@ static std::map<String, int> nick2col;
 
 void irc_t::annotate4irc(String &s)
 {
-    static int cols[8] = {253, 252, 251, 250};
-    static int next_colidx = 0;
     int col;
 
     int idx = s.indexOf('>');
@@ -171,10 +163,21 @@ void irc_t::annotate4irc(String &s)
         if (n != nick2col.end())
             col = (*n).second;
         else
-            col = nick2col[nick] = cols[(++next_colidx) % 4];
+            col = nick2col[nick] = get_nextcol();
         s = String{static_cast<char>(col)} + String{static_cast<char>(254)} + nick + String{static_cast<char>(254)} +
             s.substring(idx, s.length()); // wrap with ctrl char 254 -> revers on
     }
+}
+
+bool irc_t::get_msg(String &s)
+{
+    _FMUTEX(mutex);
+    if (msgs.size() == 0)
+        return false;
+
+    s = msgs.front();
+    msgs.pop_front();
+    return true;
 }
 
 bool irc_t::loop(pp_drv &drv)
