@@ -35,7 +35,7 @@ static int ret;
 // protect cmd exec against async commands (web, mqtt, etc.)
 static SemaphoreHandle_t cmd_mutex = xSemaphoreCreateMutex();
 
-static uCmode_t cached_uCmode = uCCoRoutine;
+static uCmode_t cached_uCmode = uCZiModem;  // defaults to ZiModem
 uCmode_t get_mode(void)
 {
     return cached_uCmode;
@@ -285,6 +285,7 @@ void setup_cmd()
     drv.open();
 
     zisetup_parallel();
+    change_mode(uCZiModem);
 }
 
 void loop_cmd()

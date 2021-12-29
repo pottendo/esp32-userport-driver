@@ -118,10 +118,18 @@ void setup_wifi(void)
 
 void loop_wifi(void)
 {
+    static int recon = 0;
     if (!WiFi.isConnected())
     {
         log_msg("Wifi not connected ... strange\n");
+        delay(500);
         WiFi.reconnect();
+        if ((++recon) > 10)
+        {
+            log_msg("Reconnect failed too often... rebooting.\n");
+            delay(100);
+            ESP.restart();
+        }
         return;
     }
     loop_websocket();
