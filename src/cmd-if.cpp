@@ -84,6 +84,7 @@ int process_cmd(char *cmd)
     }
     log_msg("Unknown command: '%s'\n", cmd);
 out:
+    log_msg("...done.\n");
     web_send_cmd("CoRoutine#idle");
     return ret;
 }

@@ -168,7 +168,7 @@ void pp_drv::pc2_isr(void)
         }
         if (xTaskWokenByReceive != pdFALSE)
             taskYIELD();
-        udelay(15);
+        udelay(25); // was 15, testing for soft80
     }
 }
 
