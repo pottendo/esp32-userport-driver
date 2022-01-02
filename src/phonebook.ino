@@ -136,7 +136,7 @@ void PhoneBookEntry::savePhonebook()
   PhoneBookEntry *phb=phonebook;
   while(phb != null)
   {
-    f.printf("%ul,%s,%s,%s\n",phb->number,phb->address,phb->modifiers,phb->notes);
+    f.printf("%u,%s,%s,%s\n",phb->number,phb->address,phb->modifiers,phb->notes);
     phb = phb->next;
     ct++;
   }
