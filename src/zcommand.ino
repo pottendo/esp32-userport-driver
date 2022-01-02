@@ -1957,6 +1957,13 @@ ZResult ZCommand::doSerialCommand()
     return result;
   }
 #endif 
+  extern void do_test(int);
+  if (t == "ATTEST")
+  {
+    int testno = sbuf.substring(6, sbuf.length()).toInt();
+    do_test(testno);
+    return (ZResult)ZOK2;
+  }
 
   int index = 0;
   while ((index < len - 1) && ((lc(sbuf[index]) != 'a') || (lc(sbuf[index + 1]) != 't')))

@@ -22,6 +22,8 @@
 #include "misc.h"
 #include "logger.h"
 
+//#define DUMP_TRAFFIC
+
 void udelay(unsigned long us)
 {
     unsigned long st = micros();
@@ -116,12 +118,11 @@ void pp_drv::pc2_isr(void)
         char c;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
-            if ((digitalRead(SP2) == HIGH) &&
-                (xQueueReceiveFromISR(tx_queue, (void *)&c,
-                                      &xTaskWokenByReceive) == pdTRUE))
+            if (xQueueReceiveFromISR(tx_queue, (void *)&c, &xTaskWokenByReceive) == pdTRUE)
             {
                 //log_msg_isr("would send from ISR" + c + '\n');
-                outchar(c);
+                if (!outchar(c))
+                    log_msg_isr("write error in ISR.\n");
                 flag_handshake();
                 unsigned long to = micros();
                 while (digitalRead(PA2) != HIGH)
@@ -135,6 +136,8 @@ void pp_drv::pc2_isr(void)
                 }
                 //log_msg_isr("tc2 handshake 1 took %ldus\n", micros() - to);
             }
+            else
+                log_msg_isr("xQueueReceive failed in ISR.\n");
         }
         else
         {
@@ -298,12 +301,17 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
 }
 
 // also called from ISR context!
-void pp_drv::outchar(const char ct)
+bool pp_drv::outchar(const char ct)
 {
-    for (uint8_t s = _PB0; (digitalRead(SP2) == HIGH) && (s <= _PB7); s++)
+    for (uint8_t s = _PB0; s <= _PB7; s++)
     {
-        uint8_t bit = (ct & (1 << s)) ? HIGH : LOW;
-        digitalWrite(PAR(s), bit);
+        if (digitalRead(SP2) == HIGH)
+        {
+            uint8_t bit = (ct & (1 << s)) ? HIGH : LOW;
+            digitalWrite(PAR(s), bit);
+        }
+        else
+            return false;
         //log_msg("%d", bit);
     }
 }
@@ -312,26 +320,42 @@ ssize_t pp_drv::write(const void *buf, size_t len)
 {
     const char *str = static_cast<const char *>(buf);
     int ret = len;
+    unsigned long t1, t2;
     //log_msg("write of %d chars\n", len);
-    //char c = *str;
-    //log_msg("write '%c'/0x%02x\n", ((c == '\0') ? '~' : c), c);
     if ((len == 0) || (len >= qs))
         return -1;
+#ifdef DUMP_TRAFFIC
+    char c = *str;
+    char cd;
+    if ((c == 0xa) || (c == 0xd))
+        cd = '~';
+    else 
+        cd = c;
+    log_msg("0x%02x, /*'%c'*/\n", c, cd);
+#endif
     setup_snd();
-    int ec = 50;
+    bool was_busy = false;
+    t1 = millis();
     while (digitalRead(PA2) == HIGH)
     {
-        log_msg("C64 busy...\n");
-        delay(100);
-        if (--ec == 0)
+        delay(1);
+        was_busy = true;
+        if ((millis() - t1) > 5000) // give up after 10s
         {
+            log_msg("C64 not responding, giving up...\n");
             ret = -1;
             goto out;
         }
     }
-    unsigned long t1, t2;
+    if (was_busy)
+        log_msg("C64 was busy for %ldms.\n", millis() - t1);
     t1 = millis();
-    outchar(*str);
+    if (!outchar(*str))
+    {
+        log_msg("write error: %d bytes not written.\n", len);
+        ret = -1;
+        goto out;
+    }
     str++;
     len--;
     while (len--)
@@ -362,7 +386,6 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         log_msg("%.0f BAUD)\n", baud);
     }
 out:
-    if (ret == 1) delay(1);   // needed to proper sync for 1 char; not clear why
     setup_rcv();
     return ret;
 }
