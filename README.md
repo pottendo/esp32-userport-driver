@@ -17,16 +17,16 @@ Without the *Corona Virus*, this project never would have received the time to p
 The project is built using VSCode with the great *PlaformIO IDE* extension installed.
 Bo's modem code is directly copied (shame on me) to the repo, so it should be selfcontained and easily buildable using platformIO, embedded into VSCode.
 
-MQTT requires some credentials one needs to provide in a file mqtt-cred.h
+MQTT and IRC require some credentials one needs to provide in a file *cred.h*. A template is provided as src/cred.h
 
-WiFi configuration is bootstrapped using the great *AutoConnect* Arduine package, refer to https://hieromon.github.io/AutoConnect/index.html
+WiFi configuration is bootstrapped using the great *AutoConnect* Arduino package, refer to https://hieromon.github.io/AutoConnect/index.html
 
 ## Hardware
 The needed hardware can be easily built - even I managed to do it - Knowing the sensitivity of the I/O chips (CIAs) of a C64 specific care has been taken to protect the individual I/O lines (100 Ohm resistors). 
 I was told by HW engineers, that using this approach, even when both side apply logical *HIGH* (5V on C64, 3.3V on ESP side) the conflict would not result into damaged CIA chips. 
 During development and experimentation the SW could easily be buggy to provoke such a scenario.
 
-[ circuit & pics to be added here ]
+[ circuit diagram & pics to be added here ]
 
 ## Functions
 The ESP firmware features
