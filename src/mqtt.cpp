@@ -45,15 +45,20 @@ static void mqtt_upstream(String &, String &);
 /* embedded device name local broker on network*/
 #define MQTT_LOCAL MQTT_LOG
 
-#include "mqtt-cred.h"
+#include "cred.h"
+
 #ifndef MQTT_CRED
-#define MQTT_LOG "mqtt-logger"
-#define MQTT_LOG_USER "mqtt-user"
-#define MQTT_LOG_PW "mqtt-pw"
+#define MQTT_LOG "invalid mqtt-broker set in cred.h"
+#define MQTT_LOG_USER ""
+#define MQTT_LOG_PW ""
 #endif
 
 void setup_mqtt(void)
 {
+#ifndef MQTT_CRED
+    log_msg("mqtt credentials not set in 'cred.h' -> disabling mqtt support.\n");
+    return;
+#endif
     mqtt_mutex = xSemaphoreCreateMutex();
     V(mqtt_mutex);
     mqtt_mutex_mt = xSemaphoreCreateMutex();
@@ -63,7 +68,9 @@ void setup_mqtt(void)
 
 void loop_mqtt()
 {
-
+#ifndef MQTT_CRED
+    return;
+#endif
     std::for_each(mqtt_connections.begin(), mqtt_connections.end(),
                   [](myMqtt *c)
                   {

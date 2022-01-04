@@ -27,6 +27,11 @@
 #include "misc.h"
 #include "pet2asc.h"
 #include "cmd-if.h"
+
+#ifndef IRC_CRED
+#warning "IRC credentials not set in 'cred.h' - disabling IRC support.\n"
+#else
+
 static SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
 static std::list<String> msgs;
 
@@ -250,3 +255,5 @@ bool irc_t::loop(pp_drv &drv)
     delay(100);
     return true;
 }
+
+#endif /* IRC_CRED */

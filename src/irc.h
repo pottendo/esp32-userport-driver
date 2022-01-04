@@ -2,8 +2,10 @@
 #define __IRC_H__
 
 #include "parport-drv.h"
+#include "cred.h"
 
-#define TEST_IRC
+#ifdef IRC_CRED
+//#define TEST_IRC
 
 class irc_t
 {
@@ -24,4 +26,5 @@ public:
     int get_nextcol(void) { return cols[(++next_colidx) % num_cols]; }
 };
 
+#endif /* IRC_CRED */
 #endif
