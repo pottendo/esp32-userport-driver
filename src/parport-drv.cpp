@@ -340,15 +340,16 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     {
         delay(1);
         was_busy = true;
-        if ((millis() - t1) > 5000) // give up after 10s
+        if ((millis() - t1) > 5000) // give up after 5s
         {
             log_msg("C64 not responding, giving up...\n");
             ret = -1;
             goto out;
         }
     }
-    if (was_busy)
+    /* if (was_busy)
         log_msg("C64 was busy for %ldms.\n", millis() - t1);
+    */
     t1 = millis();
     if (!outchar(*str))
     {
