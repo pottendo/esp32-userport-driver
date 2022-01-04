@@ -1,3 +1,19 @@
+- [esp32-userport-driver](#esp32-userport-driver)
+  - [Introduction](#introduction)
+  - [Credits](#credits)
+  - [Build](#build)
+  - [Hardware](#hardware)
+    - [Connections](#connections)
+    - [Parts used](#parts-used)
+  - [Functions](#functions)
+    - [ZiModem](#zimodem)
+    - [MQTT Client as 'AT' command](#mqtt-client-as-at-command)
+    - [Remote controllable](#remote-controllable)
+    - [IRC](#irc)
+    - [Testhooks](#testhooks)
+  - [Design](#design)
+    - [Bugs / Missing Features](#bugs--missing-features)
+  - [License](#license)
 # esp32-userport-driver
 
 ## Introduction
@@ -26,11 +42,11 @@ WiFi configuration is bootstrapped using the great *AutoConnect* Arduino package
 
 **DISCLAIMER! <br>REBUILDING MAY DESTROY YOUR C64/ESP/other equipment! USE THIS INFORMATINO AT YOUR OWN RISK** 
 
-The needed hardware can be easily built - even I managed to do it - Knowing the sensitivity of the I/O chips (CIAs) of a C64 specific care has been taken to protect the individual I/O lines (100 Ohm resistors). 
+The needed hardware can be easily built - even I managed to do it - Knowing the sensitivity of the I/O chips (CIAs) of a C64, specific care has been taken to protect the individual I/O lines (100 Ohm resistors). 
 I was told by HW engineers, that using this approach, even when both side apply logical *HIGH* (5V on C64, 3.3V on ESP side) the conflict would not result into damaged CIA chips. 
 During development and experimentation the SW could easily be buggy to provoke such a scenario.
 
-[ circuit diagram ]
+[ circuit diagram missing ]
 
 ### Connections 
 
@@ -62,7 +78,7 @@ During development and experimentation the SW could easily be buggy to provoke s
 
 These can be adjusted in *parport-drv.h* to your uController preference.
 
-Power supply for the ESP is **not** provided from the C64 but needs to be provided by USB (ESP may use more than 100mA peak current). A later stage may provide some other PS concept.
+Power supply for the ESP is **not** provided from the C64 but needs to be provided by USB (ESP may use more than 100mA peak current). A later stage the project may provide some other PS concept.
 Refer to https://photos.app.goo.gl/k1wo87s1YanoMtGB7 for some pictures.
 
 ### Parts used
@@ -94,6 +110,9 @@ That's the primary function to support highspeed connectivity for the C64. The f
 Refer to https://github.com/bozimmerman/Zimodem.
 Phonebook down-/upload, MQTT (command *ATMQTT...*) have been added.
 
+### MQTT Client as 'AT' command
+Using a terminal SW (e.g. CCGMS) ZiModem has been enhanced to accept the command 'ATMQTTcmd%topic%msg'. So far only the cmd *publish* is implemented and *cmd* is ignored.
+
 ### Remote controllable
 One can use to administer the firmware via a web-page provided by the uController, by connecting to http://esp32coC64.local.
 If MQTT is enabled (default), the FW subscribes to the *c64/ctrl/#* and publishes on *c64/log*. One can use any mqtt clients to send commands or receive some log-information via MQTT.
@@ -118,3 +137,9 @@ These functions are used to test certain functionalities of the driver.
 - IRC not as flexible as needed
 
 
+## License
+
+Refer to: https://github.com/pottendo/esp32-userport-driver/blob/master/LICENSE
+
+This is a fun project - don't expect any *real* support if you need any help. I'll do my best to respond, though, as my time permits.
+(C) 2022, pottendo productions
