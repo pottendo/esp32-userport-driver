@@ -1,3 +1,4 @@
+# esp32-userport-driver
 - [esp32-userport-driver](#esp32-userport-driver)
   - [Introduction](#introduction)
   - [Credits](#credits)
@@ -14,21 +15,19 @@
   - [Design](#design)
     - [Bugs / Missing Features](#bugs--missing-features)
   - [License](#license)
-# esp32-userport-driver
-
 ## Introduction
 This project is closely connected to its counterpart, the *C64 Userport Driver* (https://github.com/pottendo/c64-userport-driver).
 
 It enables an ESP32 based uController to act a C64 userport modem, a general purpose co-processor or a generic interface to wireless connectivity (e.g. via MQTT or IRC protocolls).
 
 ## Credits
-This project is heavily based on *Bo Zimmerman's* **ZiModem** implementation (https://github.com/bozimmerman/Zimodem)
+This project is heavily based on **Bo Zimmerman's ZiModem** implementation (https://github.com/bozimmerman/Zimodem)
 
-Valuable support has been provided by members of the *WiC64* project (https://www.wic64.de/) - a great project, check it out!
+Valuable support has been provided by members of the **WiC64 project** (https://www.wic64.de/) - a great project, check it out!
 
-The *Arduino ecosystem* and its various great libraries enabled a rapid prototyping approach. The project uses several libraries, such as *AutoConnect*, *MQTT*, *ArduinoIRC* to facilitate the respective functions in high quality.
+The **Arduino ecosystem** and its various great libraries enabled a rapid prototyping approach. The project uses several libraries, such as *AutoConnect*, *MQTT*, *ArduinoIRC* to facilitate the respective functions in high quality.
 
-Without the *Corona Virus*, this project never would have received the time to progress to the current stage. Regardless of this fact, we *hate* it... 
+Without the **Corona Virus**, this project never would have received the time to progress to the current stage. Regardless of this fact, we *hate* it... 
 
 ## Build
 The project is built using VSCode with the great *PlaformIO IDE* extension installed.
@@ -135,7 +134,7 @@ These functions are used to test certain functionalities of the driver.
 
 ### Bugs / Missing Features
 - IRC not as flexible as needed
-
+- More complete MQTT cmds
 
 ## License
 
