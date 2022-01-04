@@ -1,5 +1,6 @@
 # esp32-userport-driver
 
+## Introduction
 This project is closely connected to its counterpart, the *C64 Userport Driver* (https://github.com/pottendo/c64-userport-driver).
 
 It enables an ESP32 based uController to act a C64 userport modem, a general purpose co-processor or a generic interface to wireless connectivity (e.g. via MQTT or IRC protocolls).
@@ -22,11 +23,58 @@ MQTT and IRC require some credentials one needs to provide in a file *cred.h*. A
 WiFi configuration is bootstrapped using the great *AutoConnect* Arduino package, refer to https://hieromon.github.io/AutoConnect/index.html
 
 ## Hardware
+
+**DISCLAIMER! <br>REBUILDING MAY DESTROY YOUR C64/ESP/other equipment! USE THIS INFORMATINO AT YOUR OWN RISK** 
+
 The needed hardware can be easily built - even I managed to do it - Knowing the sensitivity of the I/O chips (CIAs) of a C64 specific care has been taken to protect the individual I/O lines (100 Ohm resistors). 
 I was told by HW engineers, that using this approach, even when both side apply logical *HIGH* (5V on C64, 3.3V on ESP side) the conflict would not result into damaged CIA chips. 
 During development and experimentation the SW could easily be buggy to provoke such a scenario.
 
-[ circuit diagram & pics to be added here ]
+[ circuit diagram ]
+
+### Connections 
+
+**ATTENTION - use with care, information may be wrong**
+| C64 Userport | Level Shifter | Level Shifter| ESP I/O | Comment |
+|--------------|------|-----|--|-|
+| GND (N)| LvSh A GND|||
+| 5V (2)| LvSh A VB|LvSh B VB||
+| FLAG (B)| LvSh A B8| LvSh A A8| GPIO 15|
+| PB0 (C)| LvSh A B7| LvSh A A7|GPIO 32|
+| PB1 (D)| LvSh A B6| LvSh A A6| GPIO 19|
+| PB2 (E)| LvSh A B5| LvSh A A5| GPIO 18|
+| PB3 (F)| LvSh A B4| LvSh A A4| GPIO 5|
+| PB4 (H)| LvSh A B3| LvSh A A3| GPIO 17|
+| PB5 (J)| LvSh A B2| LvSh A A2| GPIO 16|
+| PB6 (K)| LvSh A B1| LvSh A A1| GPIO 4|
+| GND (1)| | LvSh B GND | GND|
+| PB7 (L)| LvSh B B8| LvSh B A8| GPIO 13|
+| PA2 (M)| LvSh B B7| LvSh B A7| GPIO 23|
+| PC2 (8)| LvSh B B6| LvSh B A5| GPIO 25|
+| SP2 (7)| LvSh B B5| LvSh B A5| GPIO 27|
+| - | LvSh A OE |LvSh B OE| GPIO 26 | Output enable control|
+|-| LvSh A VA | LvSh B VA| 3V3
+| CNT2 (6)| LvSh B B4| LvSh B A4| GPIO 13| not used|
+| SP1 (5)| LvSh B B3| LvSh B A3| GPIO 23|not used|
+| CNT1 (4)| LvSh B B2| LvSh B A2| GPIO 27|not used|
+| ATN (9)| LvSh B B1| LvSh B A1| GPIO 25|not used|
+| RESET(3)| ||| connected to GND via button
+
+These can be adjusted in *parport-drv.h* to your uController preference.
+
+Power supply for the ESP is **not** provided from the C64 but needs to be provided by USB (ESP may use more than 100mA peak current). A later stage may provide some other PS concept.
+Refer to https://photos.app.goo.gl/k1wo87s1YanoMtGB7 for some pictures.
+
+### Parts used
+|Part|Type|Comment|
+|---|---|---|
+|2 x AZDelivery TXS0108E| 5V <-> 3.3V Bidirectional 8 Channel Level Shifter |
+| 1 x AZDelivery ESP32 D1 Mini NodeMCU  | ESP32 uController |
+| 1 x Youmile 6x6x6 mm Miniatur-Mikro-Taster-Tastschalter  | Reset Button|
+| 16x 100Ohm Resistor | Protection|
+| Sockets||
+| 1 x Prototyping PCB 6x8cm
+| 1 x Userport Connector
 
 ## Functions
 The ESP firmware features
@@ -59,9 +107,14 @@ These functions are used to test certain functionalities of the driver.
 ## Design
 3 modes of operation
 - ZiModem (default)<br>
-  Acts as a modem, receives characters from the C64 or - if connected to a BBS bidirectional passes through traffic. ASCII/PETSCII translation is provided, where needed
+  Acts as a modem, receives characters from the C64 or - if connected to a BBS bidirectional passes through traffic. ASCII/PETSCII translation is provided, where needed.
 - CoProcesser<br>
-  Mostly testfunctions are implemented. Noticably a *mandelbrot set* zoomer has been added, to visualize GFX using the CoProcessor
+  Mostly testfunctions are implemented. Noticably a *mandelbrot set* zoomer has been added, to visualize GFX using the CoProcessor.
+  Commands are sent from the C64 using 4 byte strings and arguments, where needed.
 - IRC<br>
-  Manages the connection and ASCII/PETSCII conversion to some IRC server
+  Manages the connection and ASCII/PETSCII conversion to some IRC server. Initiated by co-processor command "IRC_".
+
+### Bugs / Missing Features
+- IRC not as flexible as needed
+
 
