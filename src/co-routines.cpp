@@ -2,6 +2,7 @@
 
 #include "parport-drv.h"
 #include "co-routines.h"
+#include "cred.h"
 
 std::list<cr_base *> cr_base::coroutines;
 char cr_base::aux_buf[MAX_AUX];
@@ -13,7 +14,9 @@ void setup_cr(void)
     new cr_dump_t{"DUM1"};
     new cr_read_t{"READ"};
     new cr_dump2_t{"DUM2"};
+#ifdef IRC_CRED
     new cr_irc_t{"IRC_"};
+#endif
 }
 
 void loop_cr(void)

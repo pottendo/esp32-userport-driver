@@ -242,6 +242,7 @@ public:
     }
 };
 
+#ifdef IRC_CRED
 class cr_irc_t : public cr_base
 {
 public:
@@ -256,4 +257,6 @@ public:
             delay(1);
     }
 };
+#endif /* IRC_CRED */
+
 #endif
