@@ -77,7 +77,8 @@ During development and experimentation the SW could easily be buggy to provoke s
 
 These can be adjusted in *parport-drv.h* to your uController preference.
 
-Power supply for the ESP is **not** provided from the C64 but needs to be provided by USB (ESP may use more than 100mA peak current). A later stage the project may provide some other PS concept.
+Power supply for the ESP is **not** provided from the C64 but needs to be provided by USB (ESP may use more than 100mA peak current). A later stage the project may provide some other PS concept.<br>
+
 Refer to https://photos.app.goo.gl/k1wo87s1YanoMtGB7 for some pictures.
 
 ### Parts used
@@ -106,11 +107,11 @@ The ESP firmware features
 
 ### ZiModem
 That's the primary function to support highspeed connectivity for the C64. The firmware features a *Hayes Modem* alike commandset. By design, some of the parameters (Baudrate, etc.) are not needed and therefore have no effect.<br>
-Refer to https://github.com/bozimmerman/Zimodem.
-Phonebook down-/upload, MQTT (command *ATMQTT...*) have been added.
+Refer to https://github.com/bozimmerman/Zimodem.<br>
+Phonebook down-/upload, MQTT (command *ATMQTT...*) have been added. See below *Remote controllable* via web-page.
 
 ### MQTT Client as 'AT' command
-Using a terminal SW (e.g. CCGMS) ZiModem has been enhanced to accept the command 'ATMQTTcmd%topic%msg'. So far only the cmd *publish* is implemented and *cmd* is ignored.
+Using a terminal SW (e.g. CCGMS) ZiModem has been enhanced to accept the command 'ATMQTTcmd%topic%msg'. So far only the cmd *publish* is implemented hardwired and *cmd* is ignored.
 
 ### Remote controllable
 One can use to administer the firmware via a web-page provided by the uController, by connecting to http://esp32coC64.local.
@@ -135,6 +136,7 @@ These functions are used to test certain functionalities of the driver.
 ### Bugs / Missing Features
 - IRC not as flexible as needed
 - More complete MQTT cmds
+- Web administration improvements, extensions
 
 ## License
 
