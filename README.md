@@ -39,7 +39,7 @@ WiFi configuration is bootstrapped using the great *AutoConnect* Arduino package
 
 ## Hardware
 
-**DISCLAIMER! <br>REBUILDING MAY DESTROY YOUR C64/ESP/other equipment! USE THIS INFORMATINO AT YOUR OWN RISK** 
+**DISCLAIMER! <br>REBUILDING MAY DESTROY YOUR C64/ESP/other equipment! USE THIS INFORMATION AT YOUR OWN RISK** 
 
 The needed hardware can be easily built - even I managed to do it - Knowing the sensitivity of the I/O chips (CIAs) of a C64, specific care has been taken to protect the individual I/O lines (100 Ohm resistors). 
 I was told by HW engineers, that using this approach, even when both side apply logical *HIGH* (5V on C64, 3.3V on ESP side) the conflict would not result into damaged CIA chips. 
@@ -69,10 +69,10 @@ During development and experimentation the SW could easily be buggy to provoke s
 | SP2 (7)| LvSh B B5| LvSh B A5| GPIO 27|
 | - | LvSh A OE |LvSh B OE| GPIO 26 | Output enable control|
 |-| LvSh A VA | LvSh B VA| 3V3
-| CNT2 (6)| LvSh B B4| LvSh B A4| GPIO 13| not used|
-| SP1 (5)| LvSh B B3| LvSh B A3| GPIO 23|not used|
-| CNT1 (4)| LvSh B B2| LvSh B A2| GPIO 27|not used|
-| ATN (9)| LvSh B B1| LvSh B A1| GPIO 25|not used|
+| CNT2 (6)| LvSh B B4| LvSh B A4| -| not used|
+| SP1 (5)| LvSh B B3| LvSh B A3| -|not used|
+| CNT1 (4)| LvSh B B2| LvSh B A2| -|not used|
+| ATN (9)| LvSh B B1| LvSh B A1| -|not used|
 | RESET(3)| ||| connected to GND via button
 
 These can be adjusted in *parport-drv.h* to your uController preference.
