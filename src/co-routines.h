@@ -148,6 +148,7 @@ public:
         {
             aux_buf[i] = charset_p_topetcii('a' + ((i + ch++) % 27));
         }
+        //delay(500);
         if ((ret = drv->write(aux_buf, b)) != b)
         {
             log_msg("write error: %d\n", ret);

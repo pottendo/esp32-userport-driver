@@ -79,7 +79,7 @@ void pp_drv::sp2_isr(void)
 /* ISRs */
 void pp_drv::pc2_isr(void)
 {
-    int8_t err = 0;
+    int32_t err = 0;
     BaseType_t higherPriorityTaskWoken = pdFALSE;
     if (mode == INPUT)
     {
@@ -123,13 +123,15 @@ void pp_drv::pc2_isr(void)
                 //log_msg_isr("would send from ISR" + c + '\n');
                 if (!outchar(c))
                     log_msg_isr("write error in ISR.\n");
+                else
+                    csent++;
                 flag_handshake();
                 unsigned long to = micros();
                 while (digitalRead(PA2) != HIGH)
                 {
                     if ((micros() - to) > 250)
                     {
-                        //log_msg_isr("TC2 handshake1 - C64 not responding.\n");
+                        log_msg_isr("TC2 handshake1 - C64 not responding.\n");
                         err = -1;
                         break;
                     }
@@ -142,24 +144,36 @@ void pp_drv::pc2_isr(void)
         else
         {
             //log_msg_isr("last char sent, releasing mutex\n");
-            if (xQueueSendToBackFromISR(s1_queue, &err, &higherPriorityTaskWoken) == errQUEUE_FULL)
+            int32_t out;
+            if (err < 0)
+            {
+                log_msg_isr("ISR write error, sent so far: %d bytes.", csent);
+                out = err;
+            }
+            else
+                out = csent;    
+    
+            if (xQueueSendToBackFromISR(s1_queue, &out, &higherPriorityTaskWoken) == errQUEUE_FULL)
                 ; //log_msg_isr("TC2 can't release write.\n");
+            csent = 0;
         }
-        if (!err)
+        if (err >= 0)
         {
             unsigned long to = micros();
             while (digitalRead(PA2) != LOW)
             {
-                if ((micros() - to) > 250)
+                if ((micros() - to) > 2250) // saw delays up to 1860us
                 {
-                    //log_msg_isr("TC2 handshake2 - C64 not responding.\n");
+                    while (digitalRead(PA2) != LOW)
+                        ;
+                    log_msg_isr("TC2 handshake2 - C64 not responding for %dus.\n", micros() - to);
                     err = -2;
                     break;
                 }
             }
-            //log_msg_isr("tc2 handshake 2 took %ldus\n", micros() - to);
+            //log_msg_isr("tc2 handshake 2 took %dus\n", micros() - to);
         }
-        if (err)
+        if (err < 0)
         {
             // in case of error empty queue
             while (uxQueueMessagesWaitingFromISR(tx_queue))
@@ -168,6 +182,7 @@ void pp_drv::pc2_isr(void)
                                      (void *)&c,
                                      &xTaskWokenByReceive);
             }
+            log_msg_isr("ISR emptied queue because of error %d.\n", err);
         }
         if (xTaskWokenByReceive != pdFALSE)
             taskYIELD();
@@ -179,14 +194,14 @@ void pp_drv::pc2_isr(void)
  * member functions
  */
 pp_drv::pp_drv(uint16_t qs, uint16_t bs)
-    : qs(qs), bs(bs), verbose(false)
+    : qs(qs), bs(bs), verbose(true)
 {
     rx_queue = xQueueCreate(qs, sizeof(char));
     tx_queue = xQueueCreate(qs, sizeof(char));
-    s1_queue = xQueueCreate(1, sizeof(int8_t));
-    s2_queue = xQueueCreate(1, sizeof(int8_t));
+    s1_queue = xQueueCreate(1, sizeof(int32_t));
+    s2_queue = xQueueCreate(1, sizeof(int32_t));
     active_drv = this;
-
+    csent = 0;
     pinMode(OE, OUTPUT);
     digitalWrite(OE, HIGH);
 }
@@ -219,10 +234,10 @@ void pp_drv::drv_ackrcv(void)
     Serial.printf("diver(wsync) launched with priority %d\n", uxTaskPriorityGet(nullptr));
     while (true)
     {
-        int8_t err;
+        int32_t err;
         if (xQueueReceive(s1_queue, &err, portMAX_DELAY) == pdTRUE)
         {
-            if (xQueueSend(s2_queue, &err, 20 & portTICK_PERIOD_MS) == pdTRUE)
+            if (xQueueSend(s2_queue, &err, 20 * portTICK_PERIOD_MS) == pdTRUE)
                 continue;
         }
         log_msg("queue s1/s2 failed.\n");
@@ -319,7 +334,7 @@ bool pp_drv::outchar(const char ct)
 ssize_t pp_drv::write(const void *buf, size_t len)
 {
     const char *str = static_cast<const char *>(buf);
-    int ret = len;
+    int32_t ret = -1;
     unsigned long t1, t2;
     //log_msg("write of %d chars\n", len);
     if ((len == 0) || (len >= qs))
@@ -357,6 +372,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         ret = -1;
         goto out;
     }
+    csent = 1;
     str++;
     len--;
     while (len--)
@@ -366,15 +382,12 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         str++;
     }
     flag_handshake();
-    int8_t err;
-    err = 0;
     float baud;
-    if (xQueueReceive(s2_queue, &err, portMAX_DELAY) == pdTRUE)
+    if (xQueueReceive(s2_queue, &ret, portMAX_DELAY) == pdTRUE)
     {
-        if (err != 0)
+        if (ret < 0)
         {
-            log_msg("write error: %d\n", err);
-            ret = -1;
+            log_msg("write error: %d\n", ret);
             goto out;
         }
     }

@@ -60,7 +60,7 @@ class pp_drv
     uint8_t mode;
     const int rbuf_len = 256;
     ring_buf_t<unsigned char> ring_buf{rbuf_len};
-
+    int32_t csent;
 #define PAR(x) (par_pins[x])
 #define PB0 PAR(_PB0)
 #define PB1 PAR(_PB1)
