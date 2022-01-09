@@ -244,13 +244,15 @@ String initialize(AutoConnectAux &aux, PageArgument &args)
 	else
 		strftime(buf, 64, "%a, %b %d %Y %H:%M:%S", &timeinfo);
 	update.value = String(buf) + " FreeMem: " + String(ESP.getFreeHeap());
-
+	String uCt1 = (get_mode() == uCCoRoutine) ? "checked" : "";
+	String uCt2 = (get_mode() == uCZiModem) ? "checked" : "";
+	
 	static const String header{"<table id=\"Table\" class='style'><tr><th>CoProc Mode</th><th>Status</th></tr>"};
 	String uCstatus{"<tr><td><label id=\"uCmode\">" + get_mode_str() + "</label></td><td><label id=\"mdetail\">unknown detail</label></tr>"};
 	static const String tail{"</table>"};
-	static const String uCm{"<br><b>Coproc Mode</b><br>"
-							"<input type=\"radio\" name=\"uCmode\" id=\"uCmode_1\" value=\"CoRoutines\" checked onclick=\"_CBuCmode(1)\"><label for=\"uCmode_1\">CoRoutines</label><br>"
-							"<input type=\"radio\" name=\"uCmode\" id=\"uCmode_2\" value=\"ZiModem\" onclick=\"_CBuCmode(2)\"><label for=\"uCmode_2\">ZiModem</label>"};
+	const String uCm{"<br><b>Coproc Mode</b><br>"
+					 "<input type=\"radio\" name=\"uCmode\" id=\"uCmode_1\" value=\"CoRoutines\"" + uCt1 + " onclick=\"_CBuCmode(1)\"><label for=\"uCmode_1\">CoRoutines</label><br>"
+					 "<input type=\"radio\" name=\"uCmode\" id=\"uCmode_2\" value=\"ZiModem\" " + uCt2 + " onclick=\"_CBuCmode(2)\"><label for=\"uCmode_2\">ZiModem</label>"};
 
 	static const String mpb{"<input type=\"button\" value=\"Phonebook\" onclick=\"_sa('phonebook')\">"};
 	static const String mqttcb_pre{"<br><b>MQTT Control</b><br><input type=\"checkbox\" id=\"mqttcb\" name=\"mqttcbox\" onchange=\"_MqttCB(this)\""};
