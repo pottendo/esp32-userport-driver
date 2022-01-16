@@ -208,7 +208,7 @@ class mandel
 
     void free_ressources(void)
     {
-        //log_msg("mandel cleaning up...\n");
+        log_msg("mandel cleaning up...\n");
         for (int i = 0; i < NO_THREADS; i++)
         {
             vTaskDelete(worker_tasks[i]);
@@ -261,7 +261,7 @@ public:
                      mark_x2 * ssw + transx,
                      mark_y2 * ssh + transy);
         go();
-
+        free_ressources();
         mark_x1 = -1;
         mark_x2 = mark_x1;
         mark_y2 = mark_y1;
