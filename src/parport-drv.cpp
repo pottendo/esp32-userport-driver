@@ -194,7 +194,7 @@ void pp_drv::pc2_isr(void)
  * member functions
  */
 pp_drv::pp_drv(uint16_t qs, uint16_t bs)
-    : qs(qs), bs(bs), verbose(true)
+    : qs(qs), bs(bs), verbose(false)
 {
     rx_queue = xQueueCreate(qs, sizeof(char));
     tx_queue = xQueueCreate(qs, sizeof(char));

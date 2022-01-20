@@ -9,7 +9,7 @@ char cr_base::aux_buf[MAX_AUX];
 
 void setup_cr(void)
 {
-    new cr_mandel_t{"MAND"};  // never freed
+    new cr_mandel_t{"MAND"}; // never freed
     new cr_echo_t{"ECHO"};
     new cr_dump_t{"DUM1"};
     new cr_read_t{"READ"};
@@ -17,14 +17,14 @@ void setup_cr(void)
 #ifdef IRC_CRED
     new cr_irc_t{"IRC_"};
 #endif
+    new cr_arith_t{"ARIT"};
 }
 
 void loop_cr(void)
-{}
-
+{
+}
 
 // Couroutines
-
 
 // Calculate & render mandelbrot set into an array layouted for C64 hires gfx
 
@@ -35,7 +35,6 @@ void loop_cr(void)
 #define IMG_H 200 // 200
 #define CSIZE (IMG_W * IMG_H) / 8
 #define PIXELW 2 // 2
-
 
 typedef uint8_t canvas_t;
 typedef int coord_t;
@@ -55,7 +54,7 @@ bool cr_mandel_t::setup()
 {
     canvas = new uint8_t[CSIZE];
     memset(canvas, 0x0, CSIZE);
-    m = (void *) new mandel<double>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
+    m = (void *)new mandel<double>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
     return true;
 }
 
@@ -68,10 +67,10 @@ bool cr_mandel_t::run(pp_drv *drv)
         log_msg("mandel parm incomplete: %d\n", ret);
         return false;
     }
-    point_t ps{aux_buf[0] + aux_buf[1]*256, aux_buf[2]};
-    point_t pe{aux_buf[3] + aux_buf[4]*256, aux_buf[5]};
+    point_t ps{aux_buf[0] + aux_buf[1] * 256, aux_buf[2]};
+    point_t pe{aux_buf[3] + aux_buf[4] * 256, aux_buf[5]};
     ps.x /= 2;
-    pe.x /= 2;    
+    pe.x /= 2;
     log_msg("mandel screen: {%d,%d} x {%d,%d}, canvas=%p\n", ps.x, ps.y, pe.x, pe.y, canvas);
     //canvas_dump(canvas);
     memset(canvas, 0x0, CSIZE);
@@ -99,9 +98,9 @@ void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)
     uint h = x % (8 / PIXELW);
     uint shift = (8 / PIXELW - 1) - h;
     uint val = (c << (shift * PIXELW));
-    
+
     //log_msg("x/y %d/%d offs %d/%d\n", x, y, (x / (8 / PIXELW)) * colb, (y / 8) * lineb  + (y % 8));
-    uint cidx = (y / 8) * lineb  + (y % 8) + (x / (8 / PIXELW)) * colb;
+    uint cidx = (y / 8) * lineb + (y % 8) + (x / (8 / PIXELW)) * colb;
     if (cidx >= CSIZE)
     {
         //log_msg("Exceeding canvas!! %d, %d/%d\n", cidx, x, y);
@@ -136,4 +135,44 @@ static void canvas_dump(canvas_t *c)
         }
         log_msg("\n");
     }
+}
+
+// arithmetic functions
+
+bool cr_arith_t::run(pp_drv *drv)
+{
+    char retbuf[6];
+    ssize_t ret;
+    ret = drv->read(aux_buf, 7);
+    if (ret != 7)
+    {
+        log_msg("coroutine arith, read error %d\n", ret);
+        return false;
+    }
+    switch (aux_buf[0])
+    {
+    case uCFSIN:
+        parse_arg(aux_buf + 1);
+        break;
+        break;
+    default:
+        log_msg("arthmetic fn '%x' not implemented.\n");
+        break;
+    }
+    snprintf(retbuf, 6, "beefe");
+    ret = drv->write(retbuf, 6);
+    if (ret != 6)
+        log_msg("coroutine arith, write error %d\n", ret);
+    return true;
+}
+
+// input C64 FP Format:
+// s[0]: exp, s[1-4]: mantissa, s[5]/Bit7 sign (0 => +, 1 = -)
+void cr_arith_t::parse_arg(const char *s)
+{
+    int sig = ((s[5] & 0b10000000) == 0) ? 1 : -1;
+    double exp = s[0] - 128;
+    arg1 = sig * (s[1] * pow2s[0] + s[2] * pow2s[1] + s[3] * pow2s[2] + s[4] * pow2s[3]) *
+           pow(2, exp);
+    log_msg("arg1 = %g\n", arg1);
 }

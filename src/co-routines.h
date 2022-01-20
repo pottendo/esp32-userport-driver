@@ -1,16 +1,16 @@
 /* -*-c++-*-
  * This file is part of esp32-userport-driver.
- * 
+ *
  * FE playground is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * FE playground is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with FE playground.  If not, see <https://www.gnu.org/licenses/>.
  *
@@ -55,7 +55,7 @@ public:
 
     bool match(char *cmd, pp_drv *drv)
     {
-        //log_msg("cmd %s vs. %s\n", cmd, name);
+        // log_msg("cmd %s vs. %s\n", cmd, name);
         if (strncmp(cmd, name.c_str(), 4) == 0)
         {
             web_send_cmd("CoRoutine#" + name);
@@ -66,20 +66,21 @@ public:
 
     virtual bool setup(void) = 0;
     virtual bool run(pp_drv *drv) = 0;
-    //virtual void loop(void) = 0;
+    // virtual void loop(void) = 0;
 };
 
 class cr_mandel_t : public cr_base
 {
-    //uint8_t *canvas;
+    // uint8_t *canvas;
     void *m;
+
 public:
     cr_mandel_t(const char *n) : cr_base(String{n}) { reg(); }
     ~cr_mandel_t() = default;
 
     bool setup(void) override;
     bool run(pp_drv *drv) override;
-    //void loop(void) override;
+    // void loop(void) override;
 };
 
 class cr_echo_t : public cr_base
@@ -148,7 +149,7 @@ public:
         {
             aux_buf[i] = charset_p_topetcii('a' + ((i + ch++) % 27));
         }
-        //delay(500);
+        // delay(500);
         if ((ret = drv->write(aux_buf, b)) != b)
         {
             log_msg("write error: %d\n", ret);
@@ -197,7 +198,6 @@ public:
         return true;
     }
 };
-
 
 class cr_read_t : public cr_base
 {
@@ -259,5 +259,18 @@ public:
     }
 };
 #endif /* IRC_CRED */
+
+class cr_arith_t : public cr_base
+{
+    const std::vector<double> pow2s = { pow(2, -8), pow(2, -16), pow(2,-24), pow(2,-32) };
+    enum { uCFADD = 0b00010000, uCFSUB = 0b00100000, uCFMUL = 0b00110000, uCFDIV = 0b01000000, uCFSIN = 0b01010000 };
+    double arg1, arg2, arg3, arg4;
+    void parse_arg(const char *);
+public:
+    cr_arith_t(const char *n) : cr_base(String{n}) { reg(); }
+    ~cr_arith_t() = default;
+    bool setup(void) override { return true; };
+    bool run(pp_drv *drv) override;
+};
 
 #endif
