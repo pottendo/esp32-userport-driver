@@ -318,15 +318,22 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
 // also called from ISR context!
 bool pp_drv::outchar(const char ct)
 {
+    unsigned long t;
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
+        t = micros();
+        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 500)) // allow 500us to pass 
+            ;
         if (digitalRead(SP2) == HIGH)
         {
             uint8_t bit = (ct & (1 << s)) ? HIGH : LOW;
             digitalWrite(PAR(s), bit);
         }
         else
+        {
+            log_msg("C64 SP2 low (=writing) - cowardly refusing to write.\n");  // may fail as ISR printfs ar no-good...
             return false;
+        }
         //log_msg("%d", bit);
     }
 }
