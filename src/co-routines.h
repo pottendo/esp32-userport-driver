@@ -262,12 +262,39 @@ public:
 
 class cr_arith_t : public cr_base
 {
-    const std::vector<double> pow2s = { pow(2, -8), pow(2, -16), pow(2,-24), pow(2,-32) };
-    enum { uCFADD = 0b00010000, uCFSUB = 0b00100000, uCFMUL = 0b00110000, uCFDIV = 0b01000000, uCFSIN = 0b01010000 };
+    const std::vector<double> pow2s = {pow(2, -8), pow(2, -16), pow(2, -24), pow(2, -32)};
+    // to be consistent with definitions on 8bit side! 
+    enum
+    {
+        uCFADD = 0b00010010,
+        uCFSUB = 0b00100010,
+        uCFMUL = 0b00110010,
+        uCFDIV = 0b01000010,
+        uCFSIN = 0b01010001
+    };
     double arg1, arg2, arg3, arg4;
     void parse_arg(const char *);
+
+    /*
+        Routines for converting Commodore's floating point format to IEEE 754 and back
+        Code for little endian machine
+        Code: Wil, 2022-Jan
+        License: The Unlicense (Free use)
+    */
+    void float2cbm6(float f, char *c);
+    void float2cbm5(float f, char *c);
+    float cbm52float(char *c);
+    float cbm62float(char *c);
+
+    void dump(float f) { char *p = (char *) &f; log_msg("%lf = %02x-%02x-%02x-%02x\n", f, p[0], p[1], p[2], p[3]); }
+    void dump5(const char *f) { char *p = (char *) f; log_msg("%02x-%02x-%02x-%02x-%02x\n", p[0], p[1], p[2], p[3], p[4]); }
+    void dump6(const char *f) { char *p = (char *) f; log_msg("%02x-%02x-%02x-%02x-%02x-%02x\n", p[0], p[1], p[2], p[3], p[4], p[5]); }
+
 public:
-    cr_arith_t(const char *n) : cr_base(String{n}) { reg(); }
+    cr_arith_t(const char *n) : cr_base(String{n})
+    {
+        reg();
+    }
     ~cr_arith_t() = default;
     bool setup(void) override { return true; };
     bool run(pp_drv *drv) override;

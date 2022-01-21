@@ -72,7 +72,7 @@ bool cr_mandel_t::run(pp_drv *drv)
     ps.x /= 2;
     pe.x /= 2;
     log_msg("mandel screen: {%d,%d} x {%d,%d}, canvas=%p\n", ps.x, ps.y, pe.x, pe.y, canvas);
-    //canvas_dump(canvas);
+    // canvas_dump(canvas);
     memset(canvas, 0x0, CSIZE);
     ((mandel<double> *)m)->select_start(ps);
     ((mandel<double> *)m)->select_end(pe);
@@ -86,7 +86,7 @@ bool cr_mandel_t::run(pp_drv *drv)
 
 int cmp(uint8_t *s, int len)
 {
-    //log_msg("compare requested with %d bytes buf=%p, canvas=%p.\n", len, s, canvas);
+    // log_msg("compare requested with %d bytes buf=%p, canvas=%p.\n", len, s, canvas);
     return memcmp(canvas, s, len);
 }
 
@@ -99,12 +99,12 @@ void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)
     uint shift = (8 / PIXELW - 1) - h;
     uint val = (c << (shift * PIXELW));
 
-    //log_msg("x/y %d/%d offs %d/%d\n", x, y, (x / (8 / PIXELW)) * colb, (y / 8) * lineb  + (y % 8));
+    // log_msg("x/y %d/%d offs %d/%d\n", x, y, (x / (8 / PIXELW)) * colb, (y / 8) * lineb  + (y % 8));
     uint cidx = (y / 8) * lineb + (y % 8) + (x / (8 / PIXELW)) * colb;
     if (cidx >= CSIZE)
     {
-        //log_msg("Exceeding canvas!! %d, %d/%d\n", cidx, x, y);
-        //delay (100 * 1000);
+        // log_msg("Exceeding canvas!! %d, %d/%d\n", cidx, x, y);
+        // delay (100 * 1000);
         return;
     }
     char t = canvas[cidx];
@@ -130,7 +130,7 @@ static void canvas_dump(canvas_t *c)
         int offs = (y / 8) * IMG_W + (y % 8);
         for (auto i = 0; i < IMG_W; i += 8)
         {
-            //log_msg("idx: %032d ", offs + i);
+            // log_msg("idx: %032d ", offs + i);
             dump_bits(c[offs + i]);
         }
         log_msg("\n");
@@ -142,37 +142,133 @@ static void canvas_dump(canvas_t *c)
 bool cr_arith_t::run(pp_drv *drv)
 {
     char retbuf[6];
+    int arg_len;
     ssize_t ret;
-    ret = drv->read(aux_buf, 7);
-    if (ret != 7)
+    ret = drv->read(aux_buf, 1);
+    if (ret != 1) // minimum 1 byte for arith-function code
     {
         log_msg("coroutine arith, read error %d\n", ret);
         return false;
     }
+    if (aux_buf[0] & 0x08)
+    {
+        log_msg("MFLPT args not yet implemented.\n");
+        arg_len = 5;
+        return false;
+    }
+    else
+        arg_len = 6;
+
+    int arg_bytes = (aux_buf[0] & 0x7) * arg_len; // number of args
+    ret = drv->read(aux_buf + 1, arg_bytes);
+    if (ret != arg_bytes) // minimum 1 byte for arith-function code
+    {
+        log_msg("coroutine arith, read error %d\n", ret);
+        return false;
+    }
+
     switch (aux_buf[0])
     {
     case uCFSIN:
-        parse_arg(aux_buf + 1);
+    {
+        arg1 = cbm62float(aux_buf + 1);
+        double s = sin(arg1);
+        float2cbm6(s, retbuf);
         break;
+    }
+    case uCFMUL:
+    {
+        arg1 = cbm62float(aux_buf + 1);
+        arg2 = cbm62float(aux_buf + 1 + arg_len);
+        double s = arg1 * arg2;
+        float2cbm6(s, retbuf);
         break;
+    }
     default:
         log_msg("arthmetic fn '%x' not implemented.\n");
         break;
     }
-    snprintf(retbuf, 6, "beefe");
     ret = drv->write(retbuf, 6);
     if (ret != 6)
         log_msg("coroutine arith, write error %d\n", ret);
     return true;
 }
 
+// convert floating point variable to CBM FAC2 format
+void cr_arith_t::float2cbm6(float f, char *c)
+{
+    uint8_t *p = (uint8_t *)&f;
+
+    if (f == 0.0)
+        c[0] = 0;
+    else
+        c[0] = (p[3] & 127) * 2 + (p[2] > 127) + 2;
+    c[1] = 128 | (p[2] & 127);
+    c[2] = p[1];
+    c[3] = p[0];
+    c[4] = 0;
+    c[5] = p[3] & 128;
+}
+
+// convert floating point value to CBM memory format
+void cr_arith_t::float2cbm5(float f, char *c)
+{
+    uint8_t *p = (uint8_t *)&f;
+
+    if (f == 0.0)
+        c[0] = 0;
+    else
+        c[0] = (p[3] & 127) * 2 + (p[2] > 127) + 2;
+    c[1] = (p[3] & 128) + (p[2] & 127);
+    c[2] = p[1];
+    c[3] = p[0];
+    c[4] = 0;
+}
+
+// convert CBM memory format to floating point variable
+float cr_arith_t::cbm52float(char *c)
+{
+    float f;
+    uint8_t *p = (uint8_t *)&f;
+    uint8_t e;
+
+    if (c[0] == 0)
+        return 0.0;
+    e = c[0] - 2;
+    p[3] = (c[1] & 128) + (e >> 1);
+    p[2] = (e & 1) * 128 + (c[1] & 127);
+    p[1] = c[2];
+    p[0] = c[3];
+
+    return f;
+}
+
+float cr_arith_t::cbm62float(char *c)
+{
+    float f;
+    uint8_t *p = (uint8_t *)&f;
+    uint8_t e;
+
+    if (c[0] == 0)
+        return 0.0;
+    e = c[0] - 2;
+    p[3] = (c[5] & 128) + (e >> 1);
+    p[2] = (e & 1) * 128 + (c[1] & 127);
+    p[1] = c[2];
+    p[0] = c[3];
+
+    return f;
+}
+
+#if 0
 // input C64 FP Format:
 // s[0]: exp, s[1-4]: mantissa, s[5]/Bit7 sign (0 => +, 1 = -)
+// not used anymore, formula from https://www.c64-wiki.com/wiki/Floating_point_arithmetic#Conversion_example
 void cr_arith_t::parse_arg(const char *s)
 {
     int sig = ((s[5] & 0b10000000) == 0) ? 1 : -1;
     double exp = s[0] - 128;
     arg1 = sig * (s[1] * pow2s[0] + s[2] * pow2s[1] + s[3] * pow2s[2] + s[4] * pow2s[3]) *
            pow(2, exp);
-    log_msg("arg1 = %g\n", arg1);
 }
+#endif
