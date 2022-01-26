@@ -1,16 +1,16 @@
 /* -*-c++-*-
  * This file is part of esp32-userport-driver.
- * 
+ *
  * FE playground is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * FE playground is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with FE playground.  If not, see <https://www.gnu.org/licenses/>.
  *
@@ -66,13 +66,13 @@ void pp_drv::sp2_isr(void)
     if (digitalRead(SP2) == LOW)
     {
         digitalWrite(LED_BUILTIN, LOW);
-        //log_msg_isr("SP2(LOW) isr - mode C64 -> ESP\n");
+        // log_msg_isr("SP2(LOW) isr - mode C64 -> ESP\n");
         setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
     }
     else
     {
         digitalWrite(LED_BUILTIN, HIGH);
-        //log_msg_isr("SP2(HIGH) isr - mode ESP->C64\n");
+        // log_msg_isr("SP2(HIGH) isr - mode ESP->C64\n");
     }
 }
 
@@ -92,7 +92,7 @@ void pp_drv::pc2_isr(void)
             char b = (digitalRead(PAR(i)) == LOW) ? 0 : 1;
             c = (c << 1) | b;
         }
-        //log_msg_isr("ps2isr: %c\n", c);
+        // log_msg_isr("ps2isr: %c\n", c);
         if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
             blink(150, 0); // signal that we've just discarded a char
         flag_handshake();
@@ -101,49 +101,47 @@ void pp_drv::pc2_isr(void)
         {
             if ((micros() - to) > 500)
             {
-                //log_msg_isr("TC2 handshake1 - C64 not responding.\n");
+                // log_msg_isr("TC2 handshake1 - C64 not responding.\n");
                 err = -1;
-                //blink(150, 0);
+                // blink(150, 0);
                 flag_handshake();
             }
         }
-        //blink(150, 0);
+        // blink(150, 0);
         if (higherPriorityTaskWoken)
             portYIELD_FROM_ISR();
     }
     if (mode == OUTPUT)
     {
-        //log_msg_isr("pc2 isr - output\n");
+        // log_msg_isr("pc2 isr - output\n");
         BaseType_t xTaskWokenByReceive = pdFALSE;
         char c;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
             if (xQueueReceiveFromISR(tx_queue, (void *)&c, &xTaskWokenByReceive) == pdTRUE)
             {
-                //log_msg_isr("would send from ISR" + c + '\n');
+                // log_msg_isr("would send from ISR" + c + '\n');
                 if (!outchar(c))
                     log_msg_isr("write error in ISR.\n");
                 else
                     csent++;
                 flag_handshake();
                 unsigned long to = micros();
-                while (digitalRead(PA2) != HIGH)
+                while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 100000))
+                    ;
+                if ((micros() - to) > 500)
                 {
-                    if ((micros() - to) > 250)
-                    {
-                        log_msg_isr("TC2 handshake1 - C64 not responding.\n");
-                        err = -1;
-                        break;
-                    }
+                    log_msg_isr("TC2 handshake1 - C64 not responding for %dus.\n", micros() - to);
+                    err = -1;
                 }
-                //log_msg_isr("tc2 handshake 1 took %ldus\n", micros() - to);
+                // log_msg_isr("tc2 handshake 1 took %ldus\n", micros() - to);
             }
             else
                 log_msg_isr("xQueueReceive failed in ISR.\n");
         }
         else
         {
-            //log_msg_isr("last char sent, releasing mutex\n");
+            // log_msg_isr("last char sent, releasing mutex\n");
             int32_t out;
             if (err < 0)
             {
@@ -151,10 +149,10 @@ void pp_drv::pc2_isr(void)
                 out = err;
             }
             else
-                out = csent;    
-    
+                out = csent;
+
             if (xQueueSendToBackFromISR(s1_queue, &out, &higherPriorityTaskWoken) == errQUEUE_FULL)
-                ; //log_msg_isr("TC2 can't release write.\n");
+                ; // log_msg_isr("TC2 can't release write.\n");
             csent = 0;
         }
         if (err >= 0)
@@ -171,7 +169,7 @@ void pp_drv::pc2_isr(void)
                     break;
                 }
             }
-            //log_msg_isr("tc2 handshake 2 took %dus\n", micros() - to);
+            // log_msg_isr("tc2 handshake 2 took %dus\n", micros() - to);
         }
         if (err < 0)
         {
@@ -223,7 +221,7 @@ void pp_drv::drv_body(void)
     {
         while (xQueueReceive(rx_queue, &c, portMAX_DELAY) == pdTRUE)
         {
-            //log_msg("pp - rcv: '%c'/0x%02x\n", (c? c : '~'), c);
+            // log_msg("pp - rcv: '%c'/0x%02x\n", (c? c : '~'), c);
             ring_buf.put(c);
         }
     }
@@ -246,7 +244,7 @@ void pp_drv::drv_ackrcv(void)
 
 void pp_drv::setup_snd(void)
 {
-    //log_msg("C64 Terminal - sender");
+    // log_msg("C64 Terminal - sender");
     for (uint8_t i = _PB0; i <= _PB7; i++)
     {
         pinMode(PAR(i), OUTPUT);
@@ -318,12 +316,15 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
 // also called from ISR context!
 bool pp_drv::outchar(const char ct)
 {
-    unsigned long t;
+    unsigned long t, t1;
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
         t = micros();
-        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 500)) // allow 500us to pass 
+        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 100)) // allow 100ms to pass
             ;
+        if ((t1 = (micros() - t)) > 500)
+            log_msg("outchar: C64 busy for %dus\n", t1);
+
         if (digitalRead(SP2) == HIGH)
         {
             uint8_t bit = (ct & (1 << s)) ? HIGH : LOW;
@@ -331,11 +332,12 @@ bool pp_drv::outchar(const char ct)
         }
         else
         {
-            log_msg("C64 SP2 low (=writing) - cowardly refusing to write.\n");  // may fail as ISR printfs ar no-good...
+            log_msg("C64 SP2 low (=writing) - cowardly refusing to write.\n"); // may fail as ISR printfs ar no-good...
             return false;
         }
-        //log_msg("%d", bit);
+        // log_msg("%d", bit);
     }
+    return true;
 }
 
 ssize_t pp_drv::write(const void *buf, size_t len)
@@ -343,7 +345,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     const char *str = static_cast<const char *>(buf);
     int32_t ret = -1;
     unsigned long t1, t2;
-    //log_msg("write of %d chars\n", len);
+    // log_msg("write of %d chars\n", len);
     if ((len == 0) || (len >= qs))
         return -1;
 #ifdef DUMP_TRAFFIC
@@ -351,7 +353,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     char cd;
     if ((c == 0xa) || (c == 0xd))
         cd = '~';
-    else 
+    else
         cd = c;
     log_msg("0x%02x, /*'%c'*/\n", c, cd);
 #endif
@@ -375,9 +377,17 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     t1 = millis();
     if (!outchar(*str))
     {
-        log_msg("write error: %d bytes not written.\n", len);
-        ret = -1;
-        goto out;
+        log_msg("write error %db, retrying...\n", len);
+        flag_handshake();
+        if (!outchar(*str))
+        {
+
+            log_msg("presistent write error: %d bytes not written.\n", len);
+            ret = -1;
+            flag_handshake();
+            goto out;
+        }
+        log_msg("...oisdaun, ged eh!\n");
     }
     csent = 1;
     str++;
@@ -422,7 +432,7 @@ void pp_drv::sync4write(void)
         {
             flag_handshake();
             t = millis();
-            //log_msg("kicking handshake\n");
+            // log_msg("kicking handshake\n");
         }
     }
 }
