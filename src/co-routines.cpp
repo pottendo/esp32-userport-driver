@@ -176,11 +176,35 @@ bool cr_arith_t::run(pp_drv *drv)
         float2cbm6(s, retbuf);
         break;
     }
+    case uCFADD:
+    {
+        arg1 = cbm62float(aux_buf + 1);
+        arg2 = cbm62float(aux_buf + 1 + arg_len);
+        double s = arg1 + arg2;
+        float2cbm6(s, retbuf);
+        break;
+    }
+    case uCFSUB:
+    {
+        arg1 = cbm62float(aux_buf + 1);
+        arg2 = cbm62float(aux_buf + 1 + arg_len);
+        double s = arg1 - arg2;
+        float2cbm6(s, retbuf);
+        break;
+    }
     case uCFMUL:
     {
         arg1 = cbm62float(aux_buf + 1);
         arg2 = cbm62float(aux_buf + 1 + arg_len);
         double s = arg1 * arg2;
+        float2cbm6(s, retbuf);
+        break;
+    }
+    case uCFDIV:
+    {
+        arg1 = cbm62float(aux_buf + 1);
+        arg2 = cbm62float(aux_buf + 1 + arg_len);
+        double s = arg1 / arg2;
         float2cbm6(s, retbuf);
         break;
     }
