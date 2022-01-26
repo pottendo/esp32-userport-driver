@@ -35,7 +35,7 @@ static int ret;
 // protect cmd exec against async commands (web, mqtt, etc.)
 static SemaphoreHandle_t cmd_mutex = xSemaphoreCreateMutex();
 
-static uCmode_t cached_uCmode = uCZiModem;  // defaults to ZiModem
+static uCmode_t cached_uCmode = uCZiModem; // defaults to ZiModem
 uCmode_t get_mode(void)
 {
     return cached_uCmode;
@@ -84,7 +84,7 @@ int process_cmd(char *cmd)
     }
     log_msg("Unknown command: '%s'\n", cmd);
 out:
-    //log_msg("...done.\n");
+    // log_msg("...done.\n");
     web_send_cmd("CoRoutine#idle");
     return ret;
 }
@@ -157,7 +157,7 @@ uint8_t charset_p_topetcii(uint8_t c)
         /* unhandled ctrl codes */
         return '.';
     else if ((c >= 250) && (c <= 254))
-        return c;   // control chars (for IRC)
+        return c; // control chars (for IRC)
     else if (c >= 0x7b)
     {
         /* last not least, ascii codes >= 0x7b can not be
@@ -173,9 +173,7 @@ void string2Xscii(char *buf, const char *str, char_conv_t dir)
     int i = 0;
     while (*str)
     {
-        buf[i++] = (dir == ASCII2PETSCII) ? 
-                        charset_p_topetcii(*str) :
-                        charset_p_toascii(*str, false); 
+        buf[i++] = (dir == ASCII2PETSCII) ? charset_p_topetcii(*str) : charset_p_toascii(*str, false);
         str++;
     }
     buf[i] = '\0';
@@ -187,7 +185,7 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
 {
     if (cs)
     {
-        //log_msg("before conv: 0x%02x\n", c);
+        // log_msg("before conv: 0x%02x\n", c);
         /* convert ctrl chars to "screencodes" (used by monitor) */
         if (c == 0x64)
             return c = 95; // underline '_'
@@ -202,9 +200,9 @@ uint8_t charset_p_toascii(uint8_t c, int cs)
         // if (c <= 0x1f)
         //     c += 0x40;
     }
-    //log_msg("before dupes: 0x%02x\n", c);
+    // log_msg("before dupes: 0x%02x\n", c);
     c = petcii_fix_dupes(c);
-    //log_msg("after dupes: 0x%02x\n", c);
+    // log_msg("after dupes: 0x%02x\n", c);
     /* map petscii to ascii */
     if (c == 0x0d)
     { /* petscii "return" */
@@ -299,21 +297,28 @@ void loop_cmd()
         ziloop_parallel();
         break;
     case uCCoRoutine:
+    {
+        static int8_t rc = 0;
         // log_msg("Waiting for command from c64...\n");
-        ret = drv.read(buf, 4, false);
-        if ((ret == -1) && (mode != uCCoRoutine))
+        ret = drv.read(buf + rc, 4 - rc, false);
+        if (ret < 0)
         {
             V(cmd_mutex);
-            change_mode(mode);
+            if (mode != uCCoRoutine)
+                change_mode(mode);
             return;
         }
-        if (ret == 4)
+        rc += ret;
+        buf[rc] = '\0';
+        //  log_msg("rc = %d - buf = '%s'\n", rc, buf);
+        if (rc >= 4)
         {
-            buf[ret] = '\0';
+            buf[rc] = '\0';
             if (!process_cmd(buf))
             {
-                log_msg("Unknown CoRoutine... %s\n", buf);
+                log_msg("Unknown CoRoutine... '%s'\n", buf);
             }
+            rc = 0;
         }
 #if 0
         else
@@ -328,7 +333,8 @@ void loop_cmd()
             delay(500);
         }
 #endif
-        break;
+    }
+    break;
     default:
         V(cmd_mutex);
         change_mode(uCCoRoutine);
