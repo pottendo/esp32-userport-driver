@@ -310,7 +310,7 @@ void loop_cmd()
         }
         rc += ret;
         buf[rc] = '\0';
-        //  log_msg("rc = %d - buf = '%s'\n", rc, buf);
+        //log_msg("rc = %d - buf = '%s'\n", rc, buf);
         if (rc >= 4)
         {
             buf[rc] = '\0';

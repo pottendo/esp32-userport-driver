@@ -18,6 +18,7 @@ void setup_cr(void)
     new cr_irc_t{"IRC_"};
 #endif
     new cr_arith_t{"ARIT"};
+    new cr_plot_t{"PLOT"};
 }
 
 void loop_cr(void)
@@ -29,12 +30,13 @@ void loop_cr(void)
 // Calculate & render mandelbrot set into an array layouted for C64 hires gfx
 
 #define NO_THREADS 4
-#define PAL_SIZE 4
 #define MAX_ITER 128
 #define IMG_W 320 // 320
 #define IMG_H 200 // 200
 #define CSIZE (IMG_W * IMG_H) / 8
 #define PIXELW 2 // 2
+#define PAL_SIZE (2 * PIXELW)
+#define MTYPE double
 
 typedef uint8_t canvas_t;
 typedef int coord_t;
@@ -54,7 +56,7 @@ bool cr_mandel_t::setup()
 {
     canvas = new uint8_t[CSIZE];
     memset(canvas, 0x0, CSIZE);
-    m = (void *)new mandel<double>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
+    m = (void *)new mandel<MTYPE>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
     return true;
 }
 
@@ -69,13 +71,13 @@ bool cr_mandel_t::run(pp_drv *drv)
     }
     point_t ps{aux_buf[0] + aux_buf[1] * 256, aux_buf[2]};
     point_t pe{aux_buf[3] + aux_buf[4] * 256, aux_buf[5]};
-    ps.x /= 2;
-    pe.x /= 2;
+    ps.x /= PIXELW;
+    pe.x /= PIXELW;
     log_msg("mandel screen: {%d,%d} x {%d,%d}, canvas=%p\n", ps.x, ps.y, pe.x, pe.y, canvas);
     // canvas_dump(canvas);
     memset(canvas, 0x0, CSIZE);
-    ((mandel<double> *)m)->select_start(ps);
-    ((mandel<double> *)m)->select_end(pe);
+    ((mandel<MTYPE> *)m)->select_start(ps);
+    ((mandel<MTYPE> *)m)->select_end(pe);
     if ((ret = drv->write((const char *)canvas, CSIZE)) != CSIZE)
     {
         log_msg("mandel failed to write %d\n", ret);
@@ -296,3 +298,38 @@ void cr_arith_t::parse_arg(const char *s)
            pow(2, exp);
 }
 #endif
+
+bool cr_plot_t::run(pp_drv *drv)
+{
+    int ret = drv->read(aux_buf, 1);
+    if (ret != 1)
+    {
+        log_msg("coroutine plot, read error: %d\n", ret);
+        return false;
+    }
+    log_msg("plot %d selected.\n", aux_buf[0]);
+    for (int x = 0; x < 320; x++)
+    {
+        aux_buf[0] = x % 256;
+        aux_buf[1] = x / 256;
+        aux_buf[2] = 100 + 100 * sin(x * PI / 160.0);
+        aux_buf[3] = 1; // not used so far
+
+        ret = drv->write(aux_buf, 4);
+        if (ret != 4)
+        {
+            log_msg("coroutine plot, write error: %d\n", ret);
+            return false;
+        }
+    }
+
+    aux_buf[2] = 0xff;
+    ret = drv->write(aux_buf, 4);
+    if (ret != 4)
+    {
+        log_msg("coroutine plot, write error at exit: %d\n", ret);
+        return false;
+    }
+
+    return true;
+}

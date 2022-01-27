@@ -129,7 +129,7 @@ void pp_drv::pc2_isr(void)
                 unsigned long to = micros();
                 while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 100000))
                     ;
-                if ((micros() - to) > 500)
+                if ((micros() - to) > 2000) // was 500, 1850 seen once.
                 {
                     log_msg_isr("TC2 handshake1 - C64 not responding for %dus.\n", micros() - to);
                     err = -1;
