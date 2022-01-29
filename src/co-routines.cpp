@@ -3,6 +3,7 @@
 #include "parport-drv.h"
 #include "co-routines.h"
 #include "cred.h"
+#include "adafruit-gfx.h"
 
 std::list<cr_base *> cr_base::coroutines;
 char cr_base::aux_buf[MAX_AUX];
@@ -107,7 +108,7 @@ void cr_mandel_t::canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c
     aux_buf[2] = y;
     aux_buf[3] = val;
 
-    //log_msg("sending: %d/%d %d\n", x, y, c);
+    // log_msg("sending: %d/%d %d\n", x, y, c);
     int ret = drv->write(aux_buf, 4);
     if (ret != 4)
         log_msg("coroutine plot, write error: %d\n", ret);
@@ -317,6 +318,7 @@ void cr_arith_t::parse_arg(const char *s)
 
 bool cr_plot_t::run(pp_drv *drv)
 {
+    bool r = true;
     int ret = drv->read(aux_buf, 1);
     if (ret != 1)
     {
@@ -324,22 +326,33 @@ bool cr_plot_t::run(pp_drv *drv)
         return false;
     }
     log_msg("Coroutine plot: %d\n", aux_buf[0]);
-    for (int it = -100; it < 100; it += 2)
+    switch (aux_buf[0])
     {
-        for (int x = 0; x < 320; x++)
+    case 1:
+        for (int it = -100; it < 100; it += 2)
         {
-            aux_buf[0] = x % 256;
-            aux_buf[1] = x / 256;
-            aux_buf[2] = 100 + it * sin(x * PI / 160.0);
-            aux_buf[3] = 1 << (7 - (x % 8));    // don't care about MC
-
-            ret = drv->write(aux_buf, 4);
-            if (ret != 4)
+            for (int x = 0; x < 320; x++)
             {
-                log_msg("coroutine plot, write error: %d\n", ret);
-                return false;
+                aux_buf[0] = x % 256;
+                aux_buf[1] = x / 256;
+                aux_buf[2] = 100 + it * sin(x * PI / 160.0);
+                aux_buf[3] = 1 << (7 - (x % 8)); // don't care about MC
+
+                ret = drv->write(aux_buf, 4);
+                if (ret != 4)
+                {
+                    log_msg("coroutine plot, write error: %d\n", ret);
+                    r = false;
+                }
             }
         }
+        break;
+    case 2:
+        ret = plot_af(drv);
+        break;
+    default:
+        log_msg("unkown plot selected, ignoring.\n");
+        break;
     }
     aux_buf[2] = 0xff;
     ret = drv->write(aux_buf, 4);
@@ -349,5 +362,5 @@ bool cr_plot_t::run(pp_drv *drv)
         return false;
     }
 
-    return true;
+    return r;
 }
