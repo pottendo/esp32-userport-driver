@@ -322,7 +322,7 @@ bool pp_drv::outchar(const char ct)
         t = micros();
         while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 100)) // allow 100ms to pass
             ;
-        if ((t1 = (micros() - t)) > 500)
+        if ((t1 = (micros() - t)) > 1000)
             log_msg("outchar: C64 busy for %dus\n", t1);
 
         if (digitalRead(SP2) == HIGH)

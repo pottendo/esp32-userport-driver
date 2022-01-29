@@ -124,10 +124,10 @@ void loop_wifi(void)
         log_msg("Wifi not connected ... strange\n");
         delay(500);
         WiFi.reconnect();
-        if ((++recon) > 10)
+        if ((++recon) > 20)
         {
             log_msg("Reconnect failed too often... rebooting.\n");
-            delay(100);
+            delay(500);
             ESP.restart();
         }
         return;
