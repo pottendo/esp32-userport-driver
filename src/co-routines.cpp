@@ -9,7 +9,7 @@ char cr_base::aux_buf[MAX_AUX];
 
 void setup_cr(void)
 {
-    new cr_mandel_t{"MAND"}; // never freed
+    new cr_mandel_t{"MAND", &drv}; // never freed
     new cr_echo_t{"ECHO"};
     new cr_dump_t{"DUM1"};
     new cr_read_t{"READ"};
@@ -29,6 +29,8 @@ void loop_cr(void)
 
 // Calculate & render mandelbrot set into an array layouted for C64 hires gfx
 
+#define MANDEL_LIVE_TRACK // immediately show mandel pix, undef to result at the end (faster)
+
 #define NO_THREADS 4
 #define MAX_ITER 128
 #define IMG_W 320 // 320
@@ -38,25 +40,14 @@ void loop_cr(void)
 #define PAL_SIZE (2 * PIXELW)
 #define MTYPE double
 
-typedef uint8_t canvas_t;
-typedef int coord_t;
-typedef uint8_t color_t;
-typedef struct
-{
-    coord_t x;
-    coord_t y;
-} point_t;
-
-void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c);
-static void canvas_dump(canvas_t *c);
-static uint8_t *canvas;
+static canvas_t *_canvas; // local copy ptr for cmp - ugly hack XXX
 
 #include "mandelbrot.h"
 bool cr_mandel_t::setup()
 {
-    canvas = new uint8_t[CSIZE];
+    _canvas = canvas = new uint8_t[CSIZE];
     memset(canvas, 0x0, CSIZE);
-    m = (void *)new mandel<MTYPE>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas};
+    m = (void *)new mandel<MTYPE>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas, this};
     return true;
 }
 
@@ -78,28 +69,52 @@ bool cr_mandel_t::run(pp_drv *drv)
     memset(canvas, 0x0, CSIZE);
     ((mandel<MTYPE> *)m)->select_start(ps);
     ((mandel<MTYPE> *)m)->select_end(pe);
+#ifdef MANDEL_LIVE_TRACK
+    log_msg("...done, sending closing $ff\n");
+    aux_buf[2] = 0xff;
+    ret = drv->write(aux_buf, 4);
+    if (ret != 4)
+    {
+        log_msg("coroutine plot, write error at exit: %d\n", ret);
+        return false;
+    }
+#else
     if ((ret = drv->write((const char *)canvas, CSIZE)) != CSIZE)
     {
         log_msg("mandel failed to write %d\n", ret);
         return false;
     }
+#endif
     return true;
 }
 
 int cmp(uint8_t *s, int len)
 {
     // log_msg("compare requested with %d bytes buf=%p, canvas=%p.\n", len, s, canvas);
-    return memcmp(canvas, s, len);
+    return memcmp(_canvas, s, len);
 }
 
-void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)
+void cr_mandel_t::canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)
 {
-    const uint lineb = IMG_W / 8 * 8; // line 8 bytes per 8x8 pixel
-    const uint colb = 8;              // 8 bytes per 8x8 pixel
-
     uint h = x % (8 / PIXELW);
     uint shift = (8 / PIXELW - 1) - h;
     uint val = (c << (shift * PIXELW));
+
+#ifdef MANDEL_LIVE_TRACK
+    P(pixmutex);
+    aux_buf[0] = x % 256;
+    aux_buf[1] = x / 256;
+    aux_buf[2] = y;
+    aux_buf[3] = val;
+
+    //log_msg("sending: %d/%d %d\n", x, y, c);
+    int ret = drv->write(aux_buf, 4);
+    if (ret != 4)
+        log_msg("coroutine plot, write error: %d\n", ret);
+    V(pixmutex);
+#else
+    const uint lineb = IMG_W / 8 * 8; // line 8 bytes per 8x8 pixel
+    const uint colb = 8;              // 8 bytes per 8x8 pixel
 
     // log_msg("x/y %d/%d offs %d/%d\n", x, y, (x / (8 / PIXELW)) * colb, (y / 8) * lineb  + (y % 8));
     uint cidx = (y / 8) * lineb + (y % 8) + (x / (8 / PIXELW)) * colb;
@@ -113,10 +128,11 @@ void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)
     t %= ~val;
     t |= val;
     canvas[cidx] = t;
+#endif
     vTaskDelay(0 / portTICK_RATE_MS);
 }
 
-static void dump_bits(uint8_t c)
+void cr_mandel_t::dump_bits(uint8_t c)
 {
     for (int i = 7; i >= 0; i--)
     {
@@ -124,7 +140,7 @@ static void dump_bits(uint8_t c)
     }
 }
 
-static void canvas_dump(canvas_t *c)
+void cr_mandel_t::canvas_dump(canvas_t *c)
 {
     for (int y = 0; y < IMG_H; y++)
     {
@@ -307,22 +323,24 @@ bool cr_plot_t::run(pp_drv *drv)
         log_msg("coroutine plot, read error: %d\n", ret);
         return false;
     }
-    log_msg("plot %d selected.\n", aux_buf[0]);
-    for (int x = 0; x < 320; x++)
+    log_msg("Coroutine plot: %d\n", aux_buf[0]);
+    for (int it = -100; it < 100; it += 2)
     {
-        aux_buf[0] = x % 256;
-        aux_buf[1] = x / 256;
-        aux_buf[2] = 100 + 100 * sin(x * PI / 160.0);
-        aux_buf[3] = 1; // not used so far
-
-        ret = drv->write(aux_buf, 4);
-        if (ret != 4)
+        for (int x = 0; x < 320; x++)
         {
-            log_msg("coroutine plot, write error: %d\n", ret);
-            return false;
+            aux_buf[0] = x % 256;
+            aux_buf[1] = x / 256;
+            aux_buf[2] = 100 + it * sin(x * PI / 160.0);
+            aux_buf[3] = 1 << (7 - (x % 8));    // don't care about MC
+
+            ret = drv->write(aux_buf, 4);
+            if (ret != 4)
+            {
+                log_msg("coroutine plot, write error: %d\n", ret);
+                return false;
+            }
         }
     }
-
     aux_buf[2] = 0xff;
     ret = drv->write(aux_buf, 4);
     if (ret != 4)

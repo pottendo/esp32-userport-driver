@@ -33,6 +33,7 @@ class cr_base
 {
 protected:
     String name;
+    pp_drv *drv;
     void reg(void)
     {
         if (setup())
@@ -45,7 +46,7 @@ protected:
     }
 
 public:
-    cr_base(String n) : name(n)
+    cr_base(String n, pp_drv *drv = nullptr) : name(n), drv(drv)
     {
     }
     ~cr_base() = default;
@@ -55,7 +56,7 @@ public:
 
     bool match(char *cmd, pp_drv *drv)
     {
-        //log_msg("cmd %s vs. %s\n", cmd, name);
+        // log_msg("cmd %s vs. %s\n", cmd, name);
         if (strncmp(cmd, name.c_str(), 4) == 0)
         {
             web_send_cmd("CoRoutine#" + name);
@@ -69,18 +70,30 @@ public:
     // virtual void loop(void) = 0;
 };
 
+typedef uint8_t canvas_t;
+typedef int coord_t;
+typedef uint8_t color_t;
+typedef struct
+{
+    coord_t x;
+    coord_t y;
+} point_t;
+
 class cr_mandel_t : public cr_base
 {
-    // uint8_t *canvas;
     void *m;
-
+    canvas_t *canvas;
+    void dump_bits(uint8_t c);
+    void canvas_dump(canvas_t *c);
+    SemaphoreHandle_t pixmutex;
 public:
-    cr_mandel_t(const char *n) : cr_base(String{n}) { reg(); }
-    ~cr_mandel_t() = default;
+    cr_mandel_t(const char *n, pp_drv *_drv) : cr_base(String{n}, _drv) { reg(); pixmutex = xSemaphoreCreateMutex(); V(pixmutex); }
+    ~cr_mandel_t() { vSemaphoreDelete(pixmutex); }
 
     bool setup(void) override;
     bool run(pp_drv *drv) override;
     // void loop(void) override;
+    void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c);
 };
 
 class cr_echo_t : public cr_base

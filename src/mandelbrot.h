@@ -73,6 +73,7 @@ class mandel
     color_t col_pal[PAL_SIZE];
     coord_t mark_x1, mark_y1, mark_x2, mark_y2;
     myDOUBLE last_xr, last_yr, ssw, ssh, transx, transy;
+    cr_mandel_t *cr;
 
     SemaphoreHandle_t master_sem, canvas_sem;
     TaskHandle_t worker_tasks[NO_THREADS];
@@ -122,7 +123,7 @@ class mandel
                 int d = mandel_calc_point(x, y);
                 P(canvas_sem);
                 //lv_canvas_set_px(canvas, xk + xo, yk + yo, col_pal[d]);
-                canvas_setpx(canvas, xk + xo, yk + yo, col_pal[d % PAL_SIZE]);
+                cr->canvas_setpx(canvas, xk + xo, yk + yo, col_pal[d % PAL_SIZE]);
                 V(canvas_sem);
                 //mandel_buffer[x][y] = mandel_calc_point(x, y, TFT_WIDTH, TFT_HEIGHT);
                 y += incy;
@@ -147,6 +148,7 @@ class mandel
             P(p->go);
             //log_msg("starting thread %d\n", p->tno);
             mandel_helper(p->xl, p->yl, p->xh, p->yh, p->incx, p->incy, p->xoffset, p->yoffset, p->width, p->height);
+            //log_msg("finished thread %d\n", p->tno);
             V(p->sem); // report we've done our job
         }
         return 0;
@@ -164,7 +166,7 @@ class mandel
         myDOUBLE stepx = (xres / thread_no) * ssw;
         myDOUBLE stepy = (yres / thread_no) * ssh;
         TaskHandle_t th;
-        if (thread_no > 4)
+        if (thread_no > 16)
         {
             log_msg("too many threads... giving up.\n");
             return;
@@ -217,8 +219,8 @@ class mandel
     }
 
 public:
-    mandel(myDOUBLE xl, myDOUBLE yl, myDOUBLE xh, myDOUBLE yh, uint16_t xr, uint16_t yr, canvas_t *c)
-        : canvas(c), xres(xr), yres(yr)
+    mandel(myDOUBLE xl, myDOUBLE yl, myDOUBLE xh, myDOUBLE yh, uint16_t xr, uint16_t yr, canvas_t *c, cr_mandel_t *_cr)
+        : canvas(c), xres(xr), yres(yr), cr(_cr)
     {
         //log_msg("mandelbrot set...\n");
         for (int i = 0; i < PAL_SIZE; i++)
