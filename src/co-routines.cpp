@@ -72,9 +72,9 @@ bool cr_mandel_t::run(pp_drv *drv)
     ((mandel<MTYPE> *)m)->select_end(pe);
 #ifdef MANDEL_LIVE_TRACK
     log_msg("...done, sending closing $ff\n");
-    aux_buf[2] = 0xff;
-    ret = drv->write(aux_buf, 4);
-    if (ret != 4)
+    aux_buf[0] = c64_adafruit::plPLEND;
+    ret = drv->write(aux_buf, 1);
+    if (ret != 1)
     {
         log_msg("coroutine plot, write error at exit: %d\n", ret);
         return false;
@@ -103,14 +103,15 @@ void cr_mandel_t::canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c
 
 #ifdef MANDEL_LIVE_TRACK
     P(pixmutex);
-    aux_buf[0] = x % 256;
-    aux_buf[1] = x / 256;
-    aux_buf[2] = y;
-    aux_buf[3] = val;
+    aux_buf[0] = c64_adafruit::plPLOT;
+    aux_buf[1] = val;
+    aux_buf[2] = x % 256;
+    aux_buf[3] = x / 256;
+    aux_buf[4] = y;
 
     // log_msg("sending: %d/%d %d\n", x, y, c);
-    int ret = drv->write(aux_buf, 4);
-    if (ret != 4)
+    int ret = drv->write(aux_buf, 5);
+    if (ret != 5)
         log_msg("coroutine plot, write error: %d\n", ret);
     V(pixmutex);
 #else
@@ -349,6 +350,7 @@ bool cr_plot_t::run(pp_drv *drv)
         break;
     case 2:
         ret = plot_af(drv);
+        goto out;
         break;
     default:
         log_msg("unkown plot selected, ignoring.\n");
@@ -361,6 +363,6 @@ bool cr_plot_t::run(pp_drv *drv)
         log_msg("coroutine plot, write error at exit: %d\n", ret);
         return false;
     }
-
+out:
     return r;
 }
