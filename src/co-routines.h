@@ -269,6 +269,7 @@ public:
         irc_t irc;
         while (irc.loop(*drv))
             delay(1);
+        return true;
     }
 };
 #endif /* IRC_CRED */

@@ -422,7 +422,7 @@ void loop_websocket(void)
 		V(web_mutex_cmds);
 		return;
 	}
-	String &c = web_cmds.front();
+	String c = web_cmds.front();
 	V(web_mutex_cmds);
 	P(web_mutex_clients);
 	for (auto clt : clients)

@@ -74,7 +74,7 @@ int process_cmd(char *cmd)
             }
         }
         strncpy(cmd_buf, cmd_buf + 1, 3);
-        int ret = drv.read(cmd_buf + 3, 1);
+        int ret = drv.read(cmd_buf + 3, 1, false);
         if (ret != 1)
         {
             log_msg("process_cmd, read error: %d\n", ret);
