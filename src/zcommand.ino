@@ -1124,6 +1124,7 @@ ZResult ZCommand::doWebDump(Stream *in, int len, const bool cacheFlag)
   machineState = stateMachine;
   if (bct > 0)
     serial.prints(EOLN);
+  return ZOK;
 }
 
 ZResult ZCommand::doWebDump(const char *filename, const bool cache)
@@ -1732,6 +1733,7 @@ ZResult ZCommand::doHangupCommand(int vval, uint8_t *vbuf, int vlen, bool isNumb
     }
     return ZERROR;
   }
+  return ZERROR;
 }
 
 void ZCommand::updateAutoAnswer()
@@ -3183,6 +3185,7 @@ bool ZCommand::clearPlusProgress()
     currentExpiresTimeMs = 0;
   if ((strcmp((char *)nbuf, ECS) == 0) && ((millis() - lastNonPlusTimeMs) > 1000))
     currentExpiresTimeMs = millis() + 1000;
+  return false;
 }
 
 bool ZCommand::checkPlusEscape()

@@ -64,7 +64,7 @@ class WiFiClientNode : public Stream
     //int overflowBufLen = 0;
     uint8_t underflowBuf[UNDERFLOW_BUF_MAX_SIZE];
     size_t underflowBufLen = 0;
-    WiFiClientNode *next = null;
+    WiFiClientNode *next = nullptr;
 
     WiFiClientNode(char *hostIp, int newport, int flagsBitmap);
     WiFiClientNode(WiFiClient newClient, int flagsBitmap, int ringDelay);

@@ -42,6 +42,7 @@ WiFiClientNode::WiFiClientNode(char *hostIp, int newport, int flagsBitmap)
   setCharArray(&maskOuts,"");
   setCharArray(&stateMachine,"");
   machineState = stateMachine;
+  next = nullptr;
   if(!client.connect(hostIp, port))
   {
     // deleted when it returns and is deleted
@@ -88,6 +89,7 @@ WiFiClientNode::WiFiClientNode(WiFiClient newClient, int flagsBitmap, int ringDe
 WiFiClientNode::~WiFiClientNode()
 {
   lastPacketLen=0;
+  debugPrintf("%s\n", __FUNCTION__);
   if(host!=null)
   {
     client.stop();
@@ -118,7 +120,7 @@ WiFiClientNode::~WiFiClientNode()
   freeCharArray(&maskOuts);
   freeCharArray(&stateMachine);
   machineState = NULL;
-  next=null;
+  next=nullptr;
   checkOpenConnections();
 }
 
@@ -370,7 +372,7 @@ unsigned long WiFiClientNode::nextRingTime(long delta)
 size_t WiFiClientNode::write(uint8_t c)
 {
   const uint8_t one[] = {c};
-  write(one,1);
+  return write(one,1);
 }
 
 int WiFiClientNode::getNumOpenWiFiConnections()
@@ -416,6 +418,7 @@ int WiFiClientNode::checkForAutoDisconnections()
     conn = conn->next;
     if((chkConn->nextDisconnect != 0)
     &&(millis() > chkConn->nextDisconnect))
-      delete(chkConn);
+      delete chkConn;
   }
+  return 0;
 }

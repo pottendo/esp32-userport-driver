@@ -225,6 +225,7 @@ bool XModem::receive()
     if (this->dataAvail(1500)) 
       return receiveFrames(ChkSum);
   }
+  return false; // non-void function pottendo fix
 }
 
 unsigned short XModem::crc16_ccitt(char *buf, int size)

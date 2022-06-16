@@ -239,7 +239,7 @@ void ZStream::loop()
   }
   
   WiFiClientNode::checkForAutoDisconnections();
-  
+
   if(pinSupport[pinDTR])
   {
     if(lastDTR==dtrActive)
