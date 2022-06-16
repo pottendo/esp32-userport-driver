@@ -213,13 +213,13 @@ bool irc_t::loop(pp_drv &drv)
             {
                 log_msg("len write error: %d\n", ret);
             }
-            // log_msg("...wrote length...\n");
-            // delay(1000);
+            //log_msg("...wrote length...\n");
+            delay(1);
             if ((ret = drv.write(ibuf + 1, ibuf[0])) != ibuf[0])
             {
                 log_msg("data write error: %d\n", ret);
             }
-            // log_msg("...and data\n");
+            //log_msg("...and data\n");
             delay(200);
         }
     }
@@ -244,7 +244,10 @@ bool irc_t::loop(pp_drv &drv)
                 if (strcmp(buf, "*qui*") == 0)
                     return false;
 #ifndef TEST_IRC
-                iclient->sendMessage(/*"pottendo"*/ IRC_CHANNEL, String{buf});
+                iclient->sendMessage(
+                    //"pottendo",
+                    IRC_CHANNEL,
+                    String{buf});
 #endif
                 idx = 0;
                 break;
