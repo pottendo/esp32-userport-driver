@@ -168,7 +168,8 @@ class mandel
         TaskHandle_t th;
         if (thread_no > 16)
         {
-            log_msg("too many threads... giving up.\n");
+            if (thread_no != 100)   /* 100 is a dummy to just initialize, don't confuse us with this log */
+                log_msg("%s: too many threads(%d)... giving up.\n", __FUNCTION__, thread_no);
             return;
         }
         int w = (xres / thread_no);
