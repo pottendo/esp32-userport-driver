@@ -5,7 +5,7 @@
 #include "cred.h"
 
 #ifdef IRC_CRED
-//#define TEST_IRC
+#define TEST_IRC
 
 class irc_t
 {

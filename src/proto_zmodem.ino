@@ -359,7 +359,7 @@ int zmodem_tx(zmodem_t* zm, unsigned char c)
 /**********************************************/
 int zmodem_send_hex(zmodem_t* zm, uchar val)
 {
-  char* xdigit="0123456789abcdef";
+  const char* xdigit="0123456789abcdef";
   int result;
 
   //lprintf(zm,LOG_DEBUG,"send_hex: %02X ",val);

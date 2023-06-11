@@ -14,11 +14,12 @@
    limitations under the License.
 */
 #include <math.h>
+#ifndef htonl
 #define htonl(x) ( ((x)<<24 & 0xFF000000UL) | \
                    ((x)<< 8 & 0x00FF0000UL) | \
                    ((x)>> 8 & 0x0000FF00UL) | \
                    ((x)>>24 & 0x000000FFUL) )
-
+#endif
 const int NTP_PACKET_SIZE = 48;
 
 uint8_t DAYS_IN_MONTH[13] PROGMEM = {

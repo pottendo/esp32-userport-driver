@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-size_t ZPrint::writeStr(char *s)
+size_t ZPrint::writeStr(const char *s)
 {
   if(outStream != null)
   {
@@ -30,7 +30,7 @@ size_t ZPrint::writeStr(char *s)
   return 0;
 }
 
-char *ZPrint::getLastPrinterSpec()
+const char *ZPrint::getLastPrinterSpec()
 {
   if(lastPrinterSpec==0)
     return "";
@@ -62,7 +62,7 @@ void ZPrint::setTimeoutDelayMs(int ms)
     timeoutDelayMs = ms;
 }
 
-size_t ZPrint::writeChunk(char *s, int len)
+size_t ZPrint::writeChunk(const char *s, int len)
 {
   char buf[25];
   sprintf(buf,"%x\r\n",len);
@@ -85,7 +85,7 @@ void ZPrint::announcePrintJob(const char *hostIp, const int port, const char *re
   debugPrintf("Print Request is /%s\n",req);
 }
 
-ZResult ZPrint::switchToPostScript(char *prefix)
+ZResult ZPrint::switchToPostScript(const char *prefix)
 {
   if((lastPrinterSpec==0)
   ||(strlen(lastPrinterSpec)<=5)
@@ -200,7 +200,7 @@ ZResult ZPrint::switchTo(char *vbuf, int vlen, bool petscii)
   return result;
 }
 
-ZResult ZPrint::finishSwitchTo(char *hostIp, char *req, int port, bool doSSL)
+ZResult ZPrint::finishSwitchTo(const char *hostIp, char *req, int port, bool doSSL)
 {
   if((wifiSock != null) && (!wifiSock->isConnected()))
     return ZERROR;

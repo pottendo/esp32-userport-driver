@@ -26,6 +26,7 @@
 #include "logger.h"
 #include "wifi.h"
 #include "html.h"
+#include "misc.h"
 
 #ifdef MQTT
 #include "mqtt.h"
@@ -112,6 +113,7 @@ void setup_wifi(void)
 #ifdef MQTT
     setup_mqtt();
 #endif
+    setup_slip(WiFi);
 
     xTaskCreate(wifi_task, "Wifi-task", 4096, nullptr, uxTaskPriorityGet(nullptr), &wifi_th);
 }

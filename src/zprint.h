@@ -44,18 +44,18 @@ class ZPrint : public ZMode
     char lastC = 0;
     short jobNum = 0;
 
-    size_t writeStr(char *s);
-    size_t writeChunk(char *s, int len);
+    size_t writeStr(const char *s);
+    size_t writeChunk(const char *s, int len);
     void switchBackToCommandMode(bool error);
-    ZResult finishSwitchTo(char *hostIp, char *req, int port, bool doSSL);
+    ZResult finishSwitchTo(const char *hostIp, char *req, int port, bool doSSL);
     void announcePrintJob(const char *hostIp, const int port, const char *req);
 
   public:
 
     ZResult switchTo(char *vbuf, int vlen, bool petscii);
-    ZResult switchToPostScript(char *prefix);
+    ZResult switchToPostScript(const char *prefix);
     void setLastPrinterSpec(const char *spec);
-    char *getLastPrinterSpec();
+    const char *getLastPrinterSpec();
     void setTimeoutDelayMs(int ms);
     int getTimeoutDelayMs();
 

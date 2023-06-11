@@ -355,7 +355,7 @@ bool doFTPLS(ZSerial *serial, const char *hostIp, int port, const char *req, con
   respCode = getFTPResponseCode(cc, NULL);
   if(respCode < 0)
     return doFTPQuit(&cc);
-  if((req != NULL)&& (*req != NULL))
+  if((req != NULL) && (*req/* != NULL*/))
   {
     cc->printf("CWD %s\r\n",req);
     respCode = getFTPResponseCode(cc, NULL);

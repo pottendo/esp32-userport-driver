@@ -22,7 +22,9 @@ const char compile_date[] = __DATE__ " " __TIME__;
 #ifdef ARDUINO_ESP32_DEV
 #define ZIMODEM_ESP32
 #elif defined(ESP32)
+#ifndef ZIMODEM_ESP32
 #define ZIMODEM_ESP32
+#endif
 #elif defined(ARDUINO_ESP320)
 #define ZIMODEM_ESP32
 #elif defined(ARDUINO_NANO32)
@@ -132,7 +134,7 @@ const char compile_date[] = __DATE__ " " __TIME__;
 #define DEFAULT_DTR_LOW HIGH
 #endif
 
-#define DEFAULT_BAUD_RATE 38400     // was 1200
+#define DEFAULT_BAUD_RATE 115200 // 38400     // was 1200
 #define DEFAULT_SERIAL_CONFIG SERIAL_8N1
 #define MAX_PIN_NO 50
 #define INTERNAL_FLOW_CONTROL_DIV 380
@@ -159,6 +161,9 @@ public:
 #include "zcommand.h"
 #include "zconfigmode.h"
 #include "zprint.h"
+#ifdef MQTT
+#include "mqtt.h"
+#endif
 
 #ifdef INCLUDE_SD_SHELL
 #include "proto_xmodem.h"
@@ -342,7 +347,11 @@ static void changeBaudRate(int baudRate)
   dequeSize = 1 + (baudRate / INTERNAL_FLOW_CONTROL_DIV);
   debugPrintf("Deque constant now: %d\n", dequeSize);
 #ifdef ZIMODEM_ESP32
+#ifdef PARALLEL_DRV
   HWSerial.changeBaudRate(baudRate);
+#else
+  HWSerial.updateBaudRate(baudRate);
+#endif
   // HWSerial.begin(baudRate, serialConfig);  //Change baud rate
 #else
   HWSerial.begin(baudRate, serialConfig); //Change baud rate
@@ -360,8 +369,11 @@ static void changeSerialConfig(SerialConfig conf)
   dequeSize = 1 + (baudRate / INTERNAL_FLOW_CONTROL_DIV);
   debugPrintf("Deque constant now: %d\n", dequeSize);
 #ifdef ZIMODEM_ESP32
+#ifdef PARALLEL_DRV
   HWSerial.changeConfig(conf);
-  //HWSerial.begin(baudRate, conf, 16, 17);  //Change baud rate
+#else
+  HWSerial.begin(baudRate, conf, 16, 17);  //Change baud rate
+#endif
 #else
   HWSerial.begin(baudRate, conf);         //Change baud rate
 #endif
@@ -448,6 +460,7 @@ void checkFactoryReset()
 #endif
 }
 
+/* FIXME - use macro properly */
 #ifndef PARALLEL_DRV
 
 void setup()

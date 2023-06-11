@@ -1616,7 +1616,7 @@ ZResult ZCommand::doPhonebookCommand(unsigned long vval, uint8_t *vbuf, int vlen
   if (colon == NULL)
     return ZERROR;
   char *comma = strchr(colon, ',');
-  char *notes = "";
+  const char *notes = "";
   if (comma != NULL)
   {
     *comma = 0;
@@ -1805,7 +1805,7 @@ bool ZCommand::readSerialStream()
   while ((HWSerial.available() > 0) && (!crReceived))
   {
     uint8_t c = HWSerial.read();
-    //debugPrintf("%s - read %c\n", __FUNCTION__, c);
+    //debugPrintf("%s - read %c(0x%02x)\n", __FUNCTION__, c, c);
     logSerialIn(c);
     if ((c == CR[0]) || (c == LF[0]))
     {
@@ -1966,7 +1966,12 @@ ZResult ZCommand::doSerialCommand()
     do_test(testno);
     return (ZResult)ZOK2;
   }
-
+  t = sbuf.substring(0, 7);
+  if (t == "AT+COPS")
+  {
+    sendOfficialResponse(ZOK);
+    return ZOK;
+  }
   int index = 0;
   while ((index < len - 1) && ((lc(sbuf[index]) != 'a') || (lc(sbuf[index + 1]) != 't')))
   {
@@ -1983,6 +1988,7 @@ ZResult ZCommand::doSerialCommand()
     int vstart = 0;
     int vlen = 0;
     String dmodifiers = "";
+    result=ZOK;
     while (index < len)
     {
       while ((index < len) && ((sbuf[index] == ' ') || (sbuf[index] == '\t')))
@@ -2890,9 +2896,9 @@ ZResult ZCommand::doSerialCommand()
 
 void ZCommand::sendOfficialResponse(ZResult res)
 {
-  //debugPrintf("Response: %d\n", res);
   if (!suppressResponses)
   {
+    //debugPrintf("%s: Response: %d\n", __FUNCTION__, res);
     switch (res)
     {
     case ZOK:

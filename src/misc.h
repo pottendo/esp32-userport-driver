@@ -2,6 +2,7 @@
 #define __MISC_H__
 #include <Arduino.h>
 #include <stdarg.h>
+#include <WiFi.h>
 #include "logger.h"
 
 #define MUT_EXCL
@@ -12,6 +13,9 @@
 #define P(sem)
 #define V(seM)
 #endif
+
+void setup_slip(WiFiClass &);
+void loop_slip(void);
 
 class func_mutex
 {

@@ -345,7 +345,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     const char *str = static_cast<const char *>(buf);
     int32_t ret = -1;
     unsigned long t1, t2;
-    // log_msg("write of %d chars\n", len);
+    //log_msg("write of %d chars\n", len);
     if ((len == 0) || (len >= qs))
         return -1;
 #ifdef DUMP_TRAFFIC

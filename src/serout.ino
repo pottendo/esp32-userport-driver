@@ -18,7 +18,7 @@
 
 static void serialDirectWrite(uint8_t c)
 {
-
+//debugPrintf("%s - 1\n", __FUNCTION__);
   HWSerial.write(c);
   if(serialDelayMs > 0)
     delay(serialDelayMs);
@@ -192,7 +192,8 @@ bool ZSerial::isSerialOut()
     }
     return true;
 #else
-    return HWSerial.ctsActive();
+    // XXX FIXME return HWSerial.ctsActive();
+    return true;
 #endif
   case FCT_NORMAL:
   case FCT_AUTOOFF:

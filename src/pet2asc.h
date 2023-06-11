@@ -22,6 +22,7 @@
 # include "SD.h"
 # include "SPI.h"
 # include "driver/uart.h"
+# include "logger.h"
 #ifdef PARALLEL_DRV
   #include "parport-drv.h"
   #define HWSerial HWParallel
