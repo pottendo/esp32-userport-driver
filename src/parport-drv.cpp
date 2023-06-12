@@ -92,7 +92,7 @@ void pp_drv::pc2_isr(void)
             char b = (digitalRead(PAR(i)) == LOW) ? 0 : 1;
             c = (c << 1) | b;
         }
-        // log_msg_isr("ps2isr: %c\n", c);
+        //log_msg_isr("%s: %c\n", __FUNCTION__, c);
         if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
             blink(150, 0); // signal that we've just discarded a char
         flag_handshake();
@@ -101,7 +101,7 @@ void pp_drv::pc2_isr(void)
         {
             if ((micros() - to) > 500)
             {
-                // log_msg_isr("TC2 handshake1 - C64 not responding.\n");
+                log_msg_isr("TC2 handshake1 - C64 not responding.\n");
                 err = -1;
                 // blink(150, 0);
                 flag_handshake();
@@ -221,7 +221,7 @@ void pp_drv::drv_body(void)
     {
         while (xQueueReceive(rx_queue, &c, portMAX_DELAY) == pdTRUE)
         {
-            // log_msg("pp - rcv: '%c'/0x%02x\n", (c? c : '~'), c);
+            //log_msg("pp - rcv: '%c'/0x%02x\n", (c? c : '~'), c);
             ring_buf.put(c);
         }
     }
@@ -266,7 +266,7 @@ void pp_drv::setup_rcv(void)
 void pp_drv::open(void)
 {
     pinMode(PA2, INPUT);
-    pinMode(PC2, INPUT_PULLDOWN);
+    pinMode(PC2, INPUT);
     pinMode(SP2, INPUT);
     pinMode(FLAG, OUTPUT);
     digitalWrite(FLAG, HIGH);
@@ -274,8 +274,9 @@ void pp_drv::open(void)
     xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
+    log_msg("%s, PC2 = %d\n", __FUNCTION__, digitalRead(PC2));
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, HIGH);
+    attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, RISING);
 
     setup_rcv();
 }

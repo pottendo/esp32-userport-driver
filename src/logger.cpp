@@ -78,7 +78,7 @@ void setup_log(void)
 
     log_queue = xQueueCreate(20, 256);
     xTaskCreate(log_task_func, "logger", 4096, nullptr, PRIORITY_LOG, &thlog_task);
-    xTaskCreate(log_task4isr, "log4isr", 2096, nullptr, PRIORITY_LOG, &thlog_task4isr);
+    xTaskCreate(log_task4isr, "log4isr", 2096, nullptr, PRIORITY_LOG + 1, &thlog_task4isr);
 }
 
 void log_msg(const String &s)

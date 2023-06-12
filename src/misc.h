@@ -68,9 +68,9 @@ public:
     {
         P(wmutex);
         P(mutex);
+        buffer[w] = item;
         w++;
         w %= size;
-        buffer[w] = item;
         V(mutex);
         V(rmutex);
     }
@@ -91,9 +91,9 @@ public:
             return false;
         }
         P(mutex);
+        item = buffer[r];
         r++;
         r %= size;
-        item = buffer[r];
         V(mutex);
         V(wmutex);
         return true;
