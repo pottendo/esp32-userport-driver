@@ -17,7 +17,7 @@
  */
 
 #include <Arduino.h>
-
+#include <ctype.h>
 #include "parport-drv.h"
 #include "misc.h"
 #include "logger.h"
@@ -92,7 +92,7 @@ void pp_drv::pc2_isr(void)
             char b = (digitalRead(PAR(i)) == LOW) ? 0 : 1;
             c = (c << 1) | b;
         }
-        //log_msg_isr("%s: %c\n", __FUNCTION__, c);
+        // log_msg_isr("%s: %c(0x%02x)\n", __FUNCTION__, (isprint(c) ? c : '~'), c);
         if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
             blink(150, 0); // signal that we've just discarded a char
         flag_handshake();
@@ -200,8 +200,6 @@ pp_drv::pp_drv(uint16_t qs, uint16_t bs)
     s2_queue = xQueueCreate(1, sizeof(int32_t));
     active_drv = this;
     csent = 0;
-    pinMode(OE, OUTPUT);
-    digitalWrite(OE, HIGH);
 }
 
 pp_drv::~pp_drv()
@@ -266,7 +264,7 @@ void pp_drv::setup_rcv(void)
 void pp_drv::open(void)
 {
     pinMode(PA2, INPUT);
-    pinMode(PC2, INPUT);
+    pinMode(PC2, INPUT_PULLUP);
     pinMode(SP2, INPUT);
     pinMode(FLAG, OUTPUT);
     digitalWrite(FLAG, HIGH);
@@ -278,6 +276,9 @@ void pp_drv::open(void)
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, RISING);
 
+    pinMode(OE, OUTPUT);
+    digitalWrite(OE, HIGH);
+
     setup_rcv();
 }
 
@@ -287,6 +288,8 @@ void pp_drv::close(void)
     detachInterrupt(digitalPinToInterrupt(PC2));
     vTaskDelete(th1);
     vTaskDelete(th2);
+
+    digitalWrite(OE, LOW);
 }
 
 ssize_t pp_drv::read(void *buf_, size_t len, bool block)
