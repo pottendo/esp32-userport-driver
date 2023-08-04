@@ -249,6 +249,8 @@ void change_mode(uCmode_t mode)
     switch (mode)
     {
     case uCZiModem:
+        drv.close();
+        drv.open();
         log_msg("ZiModem init start\n");
         web_send_cmd("ZiModem#Initializing...");
         ziinit_modem();

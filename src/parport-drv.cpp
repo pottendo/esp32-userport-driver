@@ -66,13 +66,18 @@ void pp_drv::sp2_isr(void)
     if (digitalRead(SP2) == LOW)
     {
         digitalWrite(LED_BUILTIN, LOW);
-        // log_msg_isr("SP2(LOW) isr - mode C64 -> ESP\n");
+        //log_msg_isr("SP2(LOW) isr - mode C64 -> ESP\n");
         setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
     }
     else
     {
         digitalWrite(LED_BUILTIN, HIGH);
-        // log_msg_isr("SP2(HIGH) isr - mode ESP->C64\n");
+        //log_msg_isr("SP2(HIGH) isr - mode ESP->C64\n");
+        if (in_write)   // race management for read/write conflict
+        {
+            log_msg_isr("read/write race: SP2(HIGH) isr - mode ESP->C64\n");
+            setup_snd();
+        }
     }
 }
 
@@ -92,7 +97,7 @@ void pp_drv::pc2_isr(void)
             char b = (digitalRead(PAR(i)) == LOW) ? 0 : 1;
             c = (c << 1) | b;
         }
-        // log_msg_isr("%s: %c(0x%02x)\n", __FUNCTION__, (isprint(c) ? c : '~'), c);
+        //log_msg_isr("%s: %c(0x%02x)\n", __FUNCTION__, (isprint(c) ? c : '~'), c);
         if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
             blink(150, 0); // signal that we've just discarded a char
         flag_handshake();
@@ -192,7 +197,7 @@ void pp_drv::pc2_isr(void)
  * member functions
  */
 pp_drv::pp_drv(uint16_t qs, uint16_t bs)
-    : qs(qs), bs(bs), verbose(false)
+    : qs(qs), bs(bs), verbose(false), in_write(false)
 {
     rx_queue = xQueueCreate(qs, sizeof(char));
     tx_queue = xQueueCreate(qs, sizeof(char));
@@ -269,6 +274,7 @@ void pp_drv::open(void)
     pinMode(FLAG, OUTPUT);
     digitalWrite(FLAG, HIGH);
     mode = INPUT;
+    in_write = false;
     xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
@@ -361,9 +367,22 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         cd = c;
     log_msg("0x%02x, /*'%c'*/\n", c, cd);
 #endif
+    in_write = true;
     setup_snd();
     bool was_busy = false;
     t1 = millis();
+    while (digitalRead(SP2) == LOW)
+    {
+        log_msg("Input interfered\n");
+        delay(1);
+        was_busy = true;
+        if ((millis() - t1) > 5000) // give up after 5s
+        {
+            log_msg("C64 reading too long, giving up writing...\n");
+            ret = -1;
+            goto out;
+        }
+    }
     while (digitalRead(PA2) == HIGH)
     {
         delay(1);
@@ -382,7 +401,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     if (!outchar(*str))
     {
         log_msg("write error %db, retrying...\n", len);
-        flag_handshake();
+        //flag_handshake();
         if (!outchar(*str))
         {
 
@@ -421,6 +440,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         log_msg("%.0f BAUD)\n", baud);
     }
 out:
+    in_write = false;
     setup_rcv();
     return ret;
 }

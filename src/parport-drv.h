@@ -33,6 +33,7 @@ class pp_drv
     uint16_t qs, bs;
     TaskHandle_t th1, th2;
     bool verbose;
+    bool in_write = false;
     // enum to enable iteration over all pins
     typedef enum
     {
@@ -93,7 +94,7 @@ protected:
         digitalWrite(FLAG, HIGH);
         digitalWrite(FLAG, LOW);
     }
-
+    
 public:
     pp_drv(uint16_t qs = MAX_AUX, uint16_t bs = MAX_AUX);
     ~pp_drv();
