@@ -278,7 +278,6 @@ void pp_drv::open(void)
     xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
-    log_msg("%s, PC2 = %d\n", __FUNCTION__, digitalRead(PC2));
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, RISING);
 
@@ -327,6 +326,8 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
 bool pp_drv::outchar(const char ct)
 {
     unsigned long t, t1;
+    bool ret = true;
+    portDISABLE_INTERRUPTS();
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
         t = micros();
@@ -343,11 +344,13 @@ bool pp_drv::outchar(const char ct)
         else
         {
             log_msg("C64 SP2 low (=writing) - cowardly refusing to write.\n"); // may fail as ISR printfs ar no-good...
-            return false;
+            ret = false;
+            break;
         }
         // log_msg("%d", bit);
     }
-    return true;
+    portENABLE_INTERRUPTS();
+    return ret;
 }
 
 ssize_t pp_drv::write(const void *buf, size_t len)
@@ -382,6 +385,8 @@ ssize_t pp_drv::write(const void *buf, size_t len)
             ret = -1;
             goto out;
         }
+        if (digitalRead(SP2) == HIGH)
+            setup_snd();
     }
     while (digitalRead(PA2) == HIGH)
     {
