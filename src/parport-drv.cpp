@@ -361,6 +361,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     const char *str = static_cast<const char *>(buf);
     int32_t ret = -1;
     unsigned long t1, t2;
+    BaseType_t pw = pdFALSE;
     //log_msg("write of %d chars\n", len);
     if ((len == 0) || (len >= qs))
         return -1;
@@ -404,7 +405,6 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     /* if (was_busy)
         log_msg("C64 was busy for %ldms.\n", millis() - t1);
     */
-    BaseType_t pw;
     t1 = millis();
 
     portDISABLE_INTERRUPTS();
