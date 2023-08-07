@@ -63,7 +63,7 @@ void pp_drv::sp2_isr(void)
     // SP2 signaled by C64:
     //   LOW: C64 -> ESP
     //   HIGH: ESP -> C64 possible
-    BaseType_t higherPriorityTaskWoken;
+    BaseType_t higherPriorityTaskWoken = pdFALSE;
     if (digitalRead(SP2) == LOW)
     {
         digitalWrite(LED_BUILTIN, LOW);
@@ -80,7 +80,7 @@ void pp_drv::sp2_isr(void)
             setup_snd();
         }
     }
-    if (higherPriorityTaskWoken)
+    if (higherPriorityTaskWoken != pdFALSE)
         taskYIELD();
 }
 
@@ -116,7 +116,7 @@ void pp_drv::pc2_isr(void)
             }
         }
         // blink(150, 0);
-        if (higherPriorityTaskWoken)
+        if (higherPriorityTaskWoken != pdFALSE)
             portYIELD_FROM_ISR();
     }
     if (mode == OUTPUT)
@@ -159,7 +159,7 @@ void pp_drv::pc2_isr(void)
                 out = csent;
 
             if (xQueueSendToBackFromISR(s1_queue, &out, &higherPriorityTaskWoken) == errQUEUE_FULL)
-                ; // log_msg_isr(true, &xTaskWokenByReceive, "TC2 can't release write.\n");
+                ; // log_msg_isr(true, &higherPriorityTaskWoken, "TC2 can't release write.\n");
             csent = 0;
         }
         if (err >= 0)
