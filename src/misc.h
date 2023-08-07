@@ -39,9 +39,9 @@ inline void blink(uint32_t ms = 100, int count = 1)
     for (int i = 0; i < count; i++)
     {
         digitalWrite(2, HIGH);
-        delay(ms);
+        delayMicroseconds(ms * 1000);
         digitalWrite(2, LOW);
-        delay(ms);
+        delayMicroseconds(ms * 1000);
     }
 }
 

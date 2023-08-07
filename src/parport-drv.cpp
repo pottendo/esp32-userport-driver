@@ -88,9 +88,9 @@ void pp_drv::sp2_isr(void)
 void pp_drv::pc2_isr(void)
 {
     int32_t err = 0;
-    BaseType_t higherPriorityTaskWoken = pdFALSE;
     if (mode == INPUT)
     {
+        BaseType_t higherPriorityTaskWoken = pdFALSE;
         char c;
         int i;
         c = 0;
@@ -120,8 +120,9 @@ void pp_drv::pc2_isr(void)
             portYIELD_FROM_ISR();
     }
     if (mode == OUTPUT)
-    {
-        // log_msg_isr(true, &higherPriorityTaskWoken, "pc2 isr - output\n");
+    {   
+        BaseType_t higherPriorityTaskWoken = pdFALSE;
+        // log_msg_isr(true, &higherPriorityTaskWoken, "pc2 isr - output1 - %d\n", higherPriorityTaskWoken);
         char c;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
@@ -189,8 +190,12 @@ void pp_drv::pc2_isr(void)
             }
             log_msg_isr(true, &higherPriorityTaskWoken, "ISR emptied queue because of error %d.\n", err);
         }
+        
         if (higherPriorityTaskWoken != pdFALSE)
-            taskYIELD();
+        {
+            //log_msg_isr(true, &higherPriorityTaskWoken, "task-woken! %d\n", higherPriorityTaskWoken);
+            ; //taskYIELD();
+        }
         udelay(25); // was 15, testing for soft80
     }
 }
@@ -220,7 +225,7 @@ pp_drv::~pp_drv()
 void pp_drv::drv_body(void)
 {
     unsigned char c;
-    Serial.printf("driver(reader) launched at priority %d\n", uxTaskPriorityGet(nullptr));
+    log_msg("driver(reader) launched at priority %d\n", uxTaskPriorityGet(nullptr));
 
     while (true)
     {
@@ -249,7 +254,7 @@ void pp_drv::drv_ackrcv(void)
 
 void pp_drv::setup_snd(void)
 {
-    // log_msg("C64 Terminal - sender");
+    //log_msg("C64 Terminal - sender");
     for (uint8_t i = _PB0; i <= _PB7; i++)
     {
         pinMode(PAR(i), OUTPUT);
@@ -332,17 +337,18 @@ bool pp_drv::outchar(const char ct, bool from_isr, BaseType_t *pw)
 {
     unsigned long t, t1;
     bool ret = true;
+    //log_msg("%s: %c - ", __FUNCTION__, ct);
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
         t = micros();
-        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 1)) // allow 1ms to pass
+        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 100)) // allow 1ms to pass
             ;
         if ((t1 = (micros() - t)) > 1000)
             log_msg_isr(from_isr, pw, "outchar: C64 busy for %dus\n", t1);
-
         if (digitalRead(SP2) == HIGH)
         {
             uint8_t bit = (ct & (1 << s)) ? HIGH : LOW;
+            //log_msg("%c", (bit ? '1' : '0'));
             digitalWrite(PAR(s), bit);
         }
         else
@@ -351,8 +357,8 @@ bool pp_drv::outchar(const char ct, bool from_isr, BaseType_t *pw)
             ret = false;
             break;
         }
-        // log_msg("%d", bit);
     }
+    // log_msg("\n");
     return ret;
 }
 
@@ -407,7 +413,6 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     */
     t1 = millis();
 
-    portDISABLE_INTERRUPTS();
     setup_snd();
     if (!outchar(*str, false, &pw))
     {
@@ -419,7 +424,6 @@ ssize_t pp_drv::write(const void *buf, size_t len)
             log_msg("presistent write error: %d bytes not written.\n", len);
             ret = -1;
             flag_handshake();
-            portENABLE_INTERRUPTS();
             goto out;
         }
         log_msg("...oisdaun, ged eh!\n");
@@ -434,7 +438,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         str++;
     }
     flag_handshake();
-    portENABLE_INTERRUPTS();
+
     float baud;
     if (xQueueReceive(s2_queue, &ret, portMAX_DELAY) == pdTRUE)
     {
