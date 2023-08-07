@@ -63,22 +63,25 @@ void pp_drv::sp2_isr(void)
     // SP2 signaled by C64:
     //   LOW: C64 -> ESP
     //   HIGH: ESP -> C64 possible
+    BaseType_t higherPriorityTaskWoken;
     if (digitalRead(SP2) == LOW)
     {
         digitalWrite(LED_BUILTIN, LOW);
-        //log_msg_isr("SP2(LOW) isr - mode C64 -> ESP\n");
+        //log_msg_isr(true, &higherPriorityTaskWoken, "SP2(LOW) isr - mode C64 -> ESP\n");
         setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
     }
     else
     {
         digitalWrite(LED_BUILTIN, HIGH);
-        //log_msg_isr("SP2(HIGH) isr - mode ESP->C64\n");
+        //log_msg_isr(true, &higherPriorityTaskWoken, "SP2(HIGH) isr - mode ESP->C64\n");
         if (in_write)   // race management for read/write conflict
         {
-            log_msg_isr("read/write race: SP2(HIGH) isr - mode ESP->C64\n");
+            log_msg_isr(true, &higherPriorityTaskWoken, "read/write race: SP2(HIGH) isr - mode ESP->C64\n");
             setup_snd();
         }
     }
+    if (higherPriorityTaskWoken)
+        taskYIELD();
 }
 
 /* ISRs */
@@ -97,7 +100,7 @@ void pp_drv::pc2_isr(void)
             char b = (digitalRead(PAR(i)) == LOW) ? 0 : 1;
             c = (c << 1) | b;
         }
-        //log_msg_isr("%s: %c(0x%02x)\n", __FUNCTION__, (isprint(c) ? c : '~'), c);
+        //log_msg_isr(true, &higherPriorityTaskWoken, "%s: %c(0x%02x)\n", __FUNCTION__, (isprint(c) ? c : '~'), c);
         if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
             blink(150, 0); // signal that we've just discarded a char
         flag_handshake();
@@ -106,7 +109,7 @@ void pp_drv::pc2_isr(void)
         {
             if ((micros() - to) > 500)
             {
-                log_msg_isr("TC2 handshake1 - C64 not responding.\n");
+                log_msg_isr(true, &higherPriorityTaskWoken, "TC2 handshake1 - C64 not responding.\n");
                 err = -1;
                 // blink(150, 0);
                 flag_handshake();
@@ -118,16 +121,15 @@ void pp_drv::pc2_isr(void)
     }
     if (mode == OUTPUT)
     {
-        // log_msg_isr("pc2 isr - output\n");
-        BaseType_t xTaskWokenByReceive = pdFALSE;
+        // log_msg_isr(true, &higherPriorityTaskWoken, "pc2 isr - output\n");
         char c;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
-            if (xQueueReceiveFromISR(tx_queue, (void *)&c, &xTaskWokenByReceive) == pdTRUE)
+            if (xQueueReceiveFromISR(tx_queue, (void *)&c, &higherPriorityTaskWoken) == pdTRUE)
             {
-                // log_msg_isr("would send from ISR" + c + '\n');
-                if (!outchar(c))
-                    log_msg_isr("write error in ISR.\n");
+                // log_msg_isr(true, &higherPriorityTaskWoken, "would send from ISR" + c + '\n');
+                if (!outchar(c, true, &higherPriorityTaskWoken))
+                    log_msg_isr(true, &higherPriorityTaskWoken, "write error in ISR.\n");
                 else
                     csent++;
                 flag_handshake();
@@ -136,28 +138,28 @@ void pp_drv::pc2_isr(void)
                     ;
                 if ((micros() - to) > 2000) // was 500, 1850 seen once.
                 {
-                    log_msg_isr("TC2 handshake1 - C64 not responding for %dus.\n", micros() - to);
+                    log_msg_isr(true, &higherPriorityTaskWoken, "TC2 handshake1 - C64 not responding for %dus.\n", micros() - to);
                     err = -1;
                 }
-                // log_msg_isr("tc2 handshake 1 took %ldus\n", micros() - to);
+                // log_msg_isr(true, &higherPriorityTaskWoken, "tc2 handshake 1 took %ldus\n", micros() - to);
             }
             else
-                log_msg_isr("xQueueReceive failed in ISR.\n");
+                log_msg_isr(true, &higherPriorityTaskWoken, "xQueueReceive failed in ISR.\n");
         }
         else
         {
-            // log_msg_isr("last char sent, releasing mutex\n");
+            // log_msg_isr(true, &higherPriorityTaskWoken, "last char sent, releasing mutex\n");
             int32_t out;
             if (err < 0)
             {
-                log_msg_isr("ISR write error, sent so far: %d bytes.", csent);
+                log_msg_isr(true, &higherPriorityTaskWoken, "ISR write error, sent so far: %d bytes.", csent);
                 out = err;
             }
             else
                 out = csent;
 
             if (xQueueSendToBackFromISR(s1_queue, &out, &higherPriorityTaskWoken) == errQUEUE_FULL)
-                ; // log_msg_isr("TC2 can't release write.\n");
+                ; // log_msg_isr(true, &xTaskWokenByReceive, "TC2 can't release write.\n");
             csent = 0;
         }
         if (err >= 0)
@@ -169,12 +171,12 @@ void pp_drv::pc2_isr(void)
                 {
                     while (digitalRead(PA2) != LOW)
                         ;
-                    log_msg_isr("TC2 handshake2 - C64 not responding for %dus.\n", micros() - to);
+                    log_msg_isr(true, &higherPriorityTaskWoken, "TC2 handshake2 - C64 not responding for %dus.\n", micros() - to);
                     err = -2;
                     break;
                 }
             }
-            // log_msg_isr("tc2 handshake 2 took %dus\n", micros() - to);
+            // log_msg_isr(true, &higherPriorityTaskWoken, "tc2 handshake 2 took %dus\n", micros() - to);
         }
         if (err < 0)
         {
@@ -183,11 +185,11 @@ void pp_drv::pc2_isr(void)
             {
                 xQueueReceiveFromISR(tx_queue,
                                      (void *)&c,
-                                     &xTaskWokenByReceive);
+                                     &higherPriorityTaskWoken);
             }
-            log_msg_isr("ISR emptied queue because of error %d.\n", err);
+            log_msg_isr(true, &higherPriorityTaskWoken, "ISR emptied queue because of error %d.\n", err);
         }
-        if (xTaskWokenByReceive != pdFALSE)
+        if (higherPriorityTaskWoken != pdFALSE)
             taskYIELD();
         udelay(25); // was 15, testing for soft80
     }
@@ -275,6 +277,7 @@ void pp_drv::open(void)
     digitalWrite(FLAG, HIGH);
     mode = INPUT;
     in_write = false;
+    csent = 0;
     xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
@@ -289,6 +292,8 @@ void pp_drv::open(void)
 
 void pp_drv::close(void)
 {
+    in_write = false;
+    csent = 0;
     detachInterrupt(digitalPinToInterrupt(SP2));
     detachInterrupt(digitalPinToInterrupt(PC2));
     vTaskDelete(th1);
@@ -323,18 +328,17 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
 }
 
 // also called from ISR context!
-bool pp_drv::outchar(const char ct)
+bool pp_drv::outchar(const char ct, bool from_isr, BaseType_t *pw)
 {
     unsigned long t, t1;
     bool ret = true;
-    portDISABLE_INTERRUPTS();
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
         t = micros();
-        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 100)) // allow 100ms to pass
+        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 1)) // allow 1ms to pass
             ;
         if ((t1 = (micros() - t)) > 1000)
-            log_msg("outchar: C64 busy for %dus\n", t1);
+            log_msg_isr(from_isr, pw, "outchar: C64 busy for %dus\n", t1);
 
         if (digitalRead(SP2) == HIGH)
         {
@@ -343,13 +347,12 @@ bool pp_drv::outchar(const char ct)
         }
         else
         {
-            log_msg("C64 SP2 low (=writing) - cowardly refusing to write.\n"); // may fail as ISR printfs ar no-good...
+            log_msg_isr(from_isr, pw, "C64 SP2 low (=writing) - cowardly refusing to write.\n"); // may fail as ISR printfs ar no-good...
             ret = false;
             break;
         }
         // log_msg("%d", bit);
     }
-    portENABLE_INTERRUPTS();
     return ret;
 }
 
@@ -371,7 +374,6 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     log_msg("0x%02x, /*'%c'*/\n", c, cd);
 #endif
     in_write = true;
-    setup_snd();
     bool was_busy = false;
     t1 = millis();
     while (digitalRead(SP2) == LOW)
@@ -385,8 +387,8 @@ ssize_t pp_drv::write(const void *buf, size_t len)
             ret = -1;
             goto out;
         }
-        if (digitalRead(SP2) == HIGH)
-            setup_snd();
+        //if (digitalRead(SP2) == HIGH)
+        //    setup_snd();
     }
     while (digitalRead(PA2) == HIGH)
     {
@@ -402,17 +404,22 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     /* if (was_busy)
         log_msg("C64 was busy for %ldms.\n", millis() - t1);
     */
+    BaseType_t pw;
     t1 = millis();
-    if (!outchar(*str))
+
+    portDISABLE_INTERRUPTS();
+    setup_snd();
+    if (!outchar(*str, false, &pw))
     {
         log_msg("write error %db, retrying...\n", len);
         //flag_handshake();
-        if (!outchar(*str))
+        if (!outchar(*str, false, &pw))
         {
 
             log_msg("presistent write error: %d bytes not written.\n", len);
             ret = -1;
             flag_handshake();
+            portENABLE_INTERRUPTS();
             goto out;
         }
         log_msg("...oisdaun, ged eh!\n");
@@ -427,6 +434,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         str++;
     }
     flag_handshake();
+    portENABLE_INTERRUPTS();
     float baud;
     if (xQueueReceive(s2_queue, &ret, portMAX_DELAY) == pdTRUE)
     {

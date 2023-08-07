@@ -87,7 +87,7 @@ protected:
     void sp2_isr(void);
     void pc2_isr(void);
     void drv_ackrcv(void);
-    bool outchar(const char c);
+    bool outchar(const char c, bool from_isr, BaseType_t *pw);
     void drv_body();
     inline void flag_handshake(void)
     {

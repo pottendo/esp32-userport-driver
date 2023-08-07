@@ -100,13 +100,16 @@ void log_msg(const char *s, ...)
     //printf("%s", t);
 }
 
-void log_msg_isr(const char *s, ...)
+void log_msg_isr(bool from_isr, BaseType_t *pw, const char *s, ...)
 {
     char t[LOG_BUF];
     va_list args;
     va_start(args, s);
     vsnprintf(t, 256, s, args);
-    xQueueSend(log_queue, t, 50 * portTICK_PERIOD_MS);
+    if (from_isr)
+        xQueueSendToBackFromISR(log_queue, t, pw);
+    else
+        xQueueSend(log_queue, t, 50 * portTICK_PERIOD_MS);
 }
 
 BaseType_t log_get_stack_wm(void)
