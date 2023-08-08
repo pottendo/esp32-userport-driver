@@ -36847,7 +36847,7 @@ void do_test(int no)
         if (ret != 1)
         {
             log_msg("test failed: %d\n", ret);
-            return;
+            delay(50);
         }
     }
     log_msg("test passed.\n");

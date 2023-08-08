@@ -376,6 +376,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     //log_msg("write of %d chars\n", len);
     if ((len == 0) || (len >= qs))
         return -1;
+    size_t save_len = len;
 #ifdef DUMP_TRAFFIC
     char c = *str;
     char cd;
@@ -399,8 +400,6 @@ ssize_t pp_drv::write(const void *buf, size_t len)
             ret = -1;
             goto out;
         }
-        //if (digitalRead(SP2) == HIGH)
-        //    setup_snd();
     }
     while (digitalRead(PA2) == HIGH)
     {
@@ -422,11 +421,9 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     if (!outchar(*str, false))
     {
         log_msg("write error %db, retrying...\n", len);
-        //flag_handshake();
         if (!outchar(*str, false))
         {
 
-            flag_handshake(); // desperate attempt to unblock C64
             ret = -4;
             log_msg("presistent write error: %d bytes not written (%d).\n", len, ret);
             goto out;
@@ -445,9 +442,10 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     flag_handshake();
 
     float baud;
-    // qs is typically 8kB, with 64kBit/s -> 8kB/s -> ~1s maximum time. 
+    // qs is typically 8kB, with 64kBit/s -> 8kB/s -> ~1s maximum time.
     // in sync-mode even faster (x2)
-    if (xQueueReceive(s2_queue, &ret, qs / 8 * portTICK_PERIOD_MS) == pdTRUE)
+    // plot test takes >1s => wait 2s
+    if (xQueueReceive(s2_queue, &ret, qs / 4 * portTICK_PERIOD_MS) == pdTRUE)
     {
         if (ret < 0)
         {
@@ -457,9 +455,8 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     }
     else
     {
-        flag_handshake();   // desperate attempt to unblock C64
         ret = -5;
-        log_msg("write error: timeout (%d)\n", ret);
+        log_msg("write error: failed to write %d bytes, timeout (%d)\n", save_len - csent + 1, ret);
         goto out;
     }
     t2 = millis();
