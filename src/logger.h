@@ -25,7 +25,7 @@
 
 void log_msg(const String &s);
 void log_msg(const char *s, ...);
-void log_msg_isr(bool from_isr, BaseType_t *pw, const char *s, ...);
+void log_msg_isr(bool from_isr, const char *s, ...);
 void setup_log(void);
 void loop_log(void);
 BaseType_t log_get_stack_wm(void);
