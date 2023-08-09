@@ -71,7 +71,7 @@ bool cr_mandel_t::run(pp_drv *drv)
     ((mandel<MTYPE> *)m)->select_start(ps);
     ((mandel<MTYPE> *)m)->select_end(pe);
 #ifdef MANDEL_LIVE_TRACK
-    log_msg("...done, sending closing $ff\n");
+    log_msg("...done, sending closing %02x\n", c64_adafruit::plPLEND);
     aux_buf[0] = c64_adafruit::plPLEND;
     ret = drv->write(aux_buf, 1);
     if (ret != 1)
@@ -232,6 +232,9 @@ bool cr_arith_t::run(pp_drv *drv)
         log_msg("arthmetic fn '%x' not implemented.\n");
         break;
     }
+    // this may come before the read for response on the C64 side even has started
+    // => delay a bit.
+    delay(1);
     ret = drv->write(retbuf, 6);
     if (ret != 6)
         log_msg("coroutine arith, write error %d\n", ret);

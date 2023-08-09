@@ -94,6 +94,7 @@ protected:
         digitalWrite(FLAG, HIGH);
         digitalWrite(FLAG, LOW);
     }
+    size_t _write(const void *s, size_t len);
     
 public:
     pp_drv(uint16_t qs = MAX_AUX, uint16_t bs = MAX_AUX);
@@ -105,7 +106,7 @@ public:
     void close(void);
 
     int writestr(String &s) { return write(s.c_str(), s.length()); }
-    ssize_t write(const void *s, size_t len);
+    size_t write(const void *s, size_t len);
     size_t write(uint8_t c) { return write((const char *)(&c), 1); }
     void sync4write(void);
     ssize_t read(void *buf, size_t len, bool block = true);

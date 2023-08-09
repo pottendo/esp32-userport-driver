@@ -214,7 +214,7 @@ char c64_adafruit::buf[256];
 void c64_adafruit::push(void)
 {
     int ret, len;
-    len = (buf[0] & 0x0f) + 1;  // len coded in cmd und cmd itself
+    len = (buf[0] & 0x0f) + 1;  // len coded in cmd, low nibble
     ret = drv.write(buf, len);
     if (ret != len)
         log_msg("coroutine plot, write error: %d\n", ret);

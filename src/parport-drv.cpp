@@ -368,7 +368,19 @@ bool pp_drv::outchar(const char ct, bool from_isr)
     return ret;
 }
 
-ssize_t pp_drv::write(const void *buf, size_t len)
+size_t pp_drv::write(const void *buf, size_t len)
+{
+    size_t ret, wlen = 0;
+
+    do {
+        ret = _write((const char *)buf + wlen, len);
+        if (ret < 0) return wlen;
+        wlen += ret;
+    } while (wlen < len);   // unless some real error arrives, retry until full length is written
+    return wlen;
+}
+
+size_t pp_drv::_write(const void *buf, size_t len)
 {
     const char *str = static_cast<const char *>(buf);
     int32_t ret = -1;
@@ -423,7 +435,6 @@ ssize_t pp_drv::write(const void *buf, size_t len)
         log_msg("write error %db, retrying...\n", len);
         if (!outchar(*str, false))
         {
-
             ret = -4;
             log_msg("presistent write error: %d bytes not written (%d).\n", len, ret);
             goto out;
@@ -444,8 +455,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     float baud;
     // qs is typically 8kB, with 64kBit/s -> 8kB/s -> ~1s maximum time.
     // in sync-mode even faster (x2)
-    // plot test takes >1s => wait 2s
-    if (xQueueReceive(s2_queue, &ret, qs / 4 * portTICK_PERIOD_MS) == pdTRUE)
+    if (xQueueReceive(s2_queue, &ret, qs / 8 * portTICK_PERIOD_MS) == pdTRUE)
     {
         if (ret < 0)
         {
@@ -455,8 +465,9 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     }
     else
     {
-        ret = -5;
-        log_msg("write error: failed to write %d bytes, timeout (%d)\n", save_len - csent + 1, ret);
+        ret = csent - 1;
+        log_msg("write error: sent %d bytes, failed to write %d bytes, retrying... (timeout -5)\n", 
+                ret, save_len - csent + 1);
         goto out;
     }
     t2 = millis();
