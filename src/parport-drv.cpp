@@ -65,13 +65,11 @@ void pp_drv::sp2_isr(void)
     //   HIGH: ESP -> C64 possible
     if (digitalRead(SP2) == LOW)
     {
-        digitalWrite(LED_BUILTIN, LOW);
         //log_msg_isr(true, "SP2(LOW) isr - mode C64 -> ESP\n");
         setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
     }
     else
     {
-        digitalWrite(LED_BUILTIN, HIGH);
         //log_msg_isr(true, "SP2(HIGH) isr - mode ESP->C64\n");
         if (in_write)   // race management for read/write conflict
         {
@@ -202,7 +200,7 @@ void pp_drv::pc2_isr(void)
             //log_msg_isr(true, "task-woken! %d\n", higherPriorityTaskWoken);
             portYIELD_FROM_ISR();
         }
-        udelay(25); // was 15, testing for soft80
+        //udelay(25); // was 15, testing for soft80
     }
 }
 
@@ -455,7 +453,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
     float baud;
     // qs is typically 8kB, with 64kBit/s -> 8kB/s -> ~1s maximum time.
     // in sync-mode even faster (x2)
-    if (xQueueReceive(s2_queue, &ret, qs / 8 * portTICK_PERIOD_MS) == pdTRUE)
+    if (xQueueReceive(s2_queue, &ret, qs / 1 * portTICK_PERIOD_MS) == pdTRUE)
     {
         if (ret < 0)
         {

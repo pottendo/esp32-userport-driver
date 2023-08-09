@@ -57,7 +57,8 @@ unsigned long testTriangles()
     return 0;
 }
 
-static unsigned long testRects(uint16_t color) {
+static unsigned long testRects(uint16_t color)
+{
   int           n, i, i2,
                 cx = c64_gfx.width()  / 2,
                 cy = c64_gfx.height() / 2;
@@ -214,11 +215,14 @@ char c64_adafruit::buf[256];
 void c64_adafruit::push(void)
 {
     int ret, len;
+	char c;
     len = (buf[0] & 0x0f) + 1;  // len coded in cmd, low nibble
     ret = drv.write(buf, len);
     if (ret != len)
         log_msg("coroutine plot, write error: %d\n", ret);
-    delay(1);
+    //if ((ret = drv.read(&c, 1)) != 1)
+    //    log_msg("plot-sync read failed: %d.", ret);
+	//log_msg("sync_byte: %c\n", c);
 }
 
 void c64_adafruit::close(void)
