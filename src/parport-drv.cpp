@@ -74,7 +74,7 @@ void pp_drv::sp2_isr(void)
         if (in_write)   // race management for read/write conflict
         {
             log_msg_isr(true, "read/write race: SP2(HIGH) isr - mode ESP->C64\n");
-            setup_snd();
+            //setup_snd();
         }
     }
 }
@@ -83,9 +83,9 @@ void pp_drv::sp2_isr(void)
 void pp_drv::pc2_isr(void)
 {
     int32_t err = 0;
+    BaseType_t higherPriorityTaskWoken = pdFALSE;
     if (mode == INPUT)
     {
-        BaseType_t higherPriorityTaskWoken = pdFALSE;
         char c;
         int i;
         c = 0;
@@ -104,8 +104,8 @@ void pp_drv::pc2_isr(void)
         {
             if ((micros() - to) > 500)
             {
-                log_msg_isr(true, "TC2 read handshake - C64 not responding.\n");
-                err = -1;
+                log_msg_isr(true, "read error - TC2 read handshake - C64 not responding (-1).\n");
+                err = -1; // not passed back anyway
                 // blink(150, 0);
                 flag_handshake();
             }
@@ -116,7 +116,6 @@ void pp_drv::pc2_isr(void)
     }
     else if (in_write) // (mode == OUTPUT)
     {   
-        BaseType_t higherPriorityTaskWoken = pdFALSE;
         // log_msg_isr(true, "pc2 isr - output1 - %d\n", higherPriorityTaskWoken);
         char c;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
@@ -191,7 +190,7 @@ void pp_drv::pc2_isr(void)
             if (csent > 0)
             {
                 if (xQueueSendToBackFromISR(s1_queue, &csent, &higherPriorityTaskWoken) == errQUEUE_FULL)
-                    log_msg_isr(true, "TC2 can't release write (-101).\n");
+                    log_msg_isr(true, "TC2 can't release write (-102).\n");
                 csent = 0;
             }
             // in case of error empty queue
@@ -203,13 +202,12 @@ void pp_drv::pc2_isr(void)
             }
             log_msg_isr(true, "ISR emptied queue because of error %d.\n", err);
         }
-        
-        if (higherPriorityTaskWoken != pdFALSE)
-        {
+        //udelay(25); // was 15, testing for soft80}
+    }
+    if (higherPriorityTaskWoken != pdFALSE)
+    {
             //log_msg_isr(true, "task-woken! %d\n", higherPriorityTaskWoken);
             portYIELD_FROM_ISR();
-        }
-        //udelay(25); // was 15, testing for soft80
     }
 }
 
@@ -351,16 +349,16 @@ bool pp_drv::outchar(const char ct, bool from_isr)
     unsigned long t, t1;
     bool ret = true;
     //log_msg("%s: %c - ", __FUNCTION__, ct);
+    t = micros();
+    while (((digitalRead(SP2) == LOW) ||
+            (digitalRead(PA2) == HIGH)) && 
+            ((micros() - t) < 1000 * 5)) // allow 5ms to pass
+        ;
+    if ((t1 = (micros() - t)) > 1000)
+        log_msg_isr(from_isr, "outchar: C64 busy for %dus\n", t1);
     setup_snd();
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
-        t = micros();
-        while (((digitalRead(SP2) == LOW) ||
-                (digitalRead(PA2) == HIGH)) && 
-                ((micros() - t) < 1000 * 5)) // allow 5ms to pass
-            ;
-        if ((t1 = (micros() - t)) > 1000)
-            log_msg_isr(from_isr, "outchar: C64 busy for %dus\n", t1);
         if ((digitalRead(SP2) == HIGH) && (digitalRead(PA2) == LOW))
         {
             uint8_t bit = (ct & (1 << s)) ? HIGH : LOW;
@@ -369,7 +367,7 @@ bool pp_drv::outchar(const char ct, bool from_isr)
         }
         else
         {
-            log_msg_isr(from_isr, "C64 SP2=%d (1 == C64 writing), PA2=%d (1 == C64 busy) - cowardly refusing to write.\n",
+            log_msg_isr(from_isr, "C64 SP2=%d (0 == C64 writing), PA2=%d (1 == C64 busy) - cowardly refusing to write.\n",
                         digitalRead(SP2), digitalRead(PA2)); 
             ret = false;
             goto out;
@@ -400,11 +398,11 @@ size_t pp_drv::_write(const void *buf, size_t len)
     const char *str = static_cast<const char *>(buf);
     int32_t ret = -1;
     unsigned long t1, t2;
-    //log_msg("write of %d chars\n", len);
     if ((len == 0) || (len >= qs))
         return -1;
     size_t save_len = len;
 #ifdef DUMP_TRAFFIC
+    //log_msg("write of %d chars\n", len);
     char c = *str;
     char cd;
     if ((c == 0xa) || (c == 0xd))
@@ -413,12 +411,12 @@ size_t pp_drv::_write(const void *buf, size_t len)
         cd = c;
     log_msg("0x%02x, /*'%c'*/\n", c, cd);
 #endif
-    in_write = true;
+#if 0    
     bool was_busy = false;
     t1 = millis();
     while (digitalRead(SP2) == LOW)
     {
-        log_msg("Input interfered\n");
+        //log_msg("Input interfered\n");
         delay(1);
         was_busy = true;
         if ((millis() - t1) > 5000) // give up after 5s
@@ -428,7 +426,6 @@ size_t pp_drv::_write(const void *buf, size_t len)
             goto out;
         }
     }
-#if 0    
     while (digitalRead(PA2) == HIGH)
     {
         delay(1);
@@ -440,15 +437,19 @@ size_t pp_drv::_write(const void *buf, size_t len)
             goto out;
         }
     }
-#endif
     /* if (was_busy)
         log_msg("C64 was busy for %ldms.\n", millis() - t1);
     */
+#endif
     t1 = millis();
-
+    in_write = true;
     //setup_snd();
     if (!outchar(*str, false))
     {
+        ret = 0;
+        delay(1);
+        goto out;
+#if 0        
         log_msg("write error %db, retrying...\n", len);
         if (!outchar(*str, false))
         {
@@ -457,6 +458,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
             goto out;
         }
         log_msg("...oisdaun, ged eh!\n");
+#endif
     }
     csent = 1;
     str++;
@@ -469,7 +471,6 @@ size_t pp_drv::_write(const void *buf, size_t len)
     }
     //flag_handshake();
 
-    float baud;
     // qs is typically 8kB, with 64kBit/s -> 8kB/s -> ~1s maximum time.
     // in sync-mode even faster (x2)
     if (xQueueReceive(s2_queue, &ret, qs / 1 * portTICK_PERIOD_MS) == pdTRUE)
@@ -477,6 +478,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
         if (ret < 0)
         {
             log_msg("write error: %d\n", ret);
+            delay(1);
             goto out;
         }
     }
@@ -485,11 +487,12 @@ size_t pp_drv::_write(const void *buf, size_t len)
         ret = csent - 1;
         log_msg("write error: sent %d bytes, failed to write %d bytes, retrying... (timeout -5)\n", 
                 ret, save_len - csent + 1);
-        goto out;
+        goto out;   // no delay here as we ran into the queue timeout
     }
     t2 = millis();
     if (verbose)
     {
+        float baud;
         log_msg("sent %d chars in ", ret);
         log_msg("%dms(", t2 - t1);
         baud = ((float)ret) / (t2 - t1) * 8000;
