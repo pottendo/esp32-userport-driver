@@ -88,6 +88,7 @@ protected:
     void pc2_isr(void);
     void drv_ackrcv(void);
     bool outchar(const char c, bool from_isr);
+    size_t _write(const void *s, size_t len);
     void drv_body();
     inline void flag_handshake(void)
     {
@@ -105,7 +106,7 @@ public:
     void close(void);
 
     int writestr(String &s) { return write(s.c_str(), s.length()); }
-    ssize_t write(const void *s, size_t len);
+    size_t write(const void *s, size_t len);
     size_t write(uint8_t c) { return write((const char *)(&c), 1); }
     void sync4write(void);
     ssize_t read(void *buf, size_t len, bool block = true);

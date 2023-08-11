@@ -366,7 +366,22 @@ bool pp_drv::outchar(const char ct, bool from_isr)
     return ret;
 }
 
-ssize_t pp_drv::write(const void *buf, size_t len)
+size_t pp_drv::write(const void *buf, size_t len)
+{
+    int32_t wlen = 0, ret;
+    do {
+        ret = _write((const char *)buf + wlen, len - wlen);
+        if (ret < 0) 
+        {
+            log_msg("write error, ret = %d\n", ret);
+            return wlen;
+        }
+        wlen += ret;
+    } while (wlen < len);   // unless some real error arrives, retry until full length is written
+    return wlen;
+}
+
+size_t pp_drv::_write(const void *buf, size_t len)
 {
     const char *str = static_cast<const char *>(buf);
     int32_t ret = -1;
@@ -442,7 +457,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     float baud;
     // qs is typically 8kB, with 64kBit/s -> 8kB/s -> ~1s maximum time.
     // in sync-mode even faster (x2)
-    // plot test takes >1s => wait 2s
+    // plot test takes >1s => wait 4s
     if (xQueueReceive(s2_queue, &ret, qs / 2 * portTICK_PERIOD_MS) == pdTRUE)
     {
         if (ret < 0)

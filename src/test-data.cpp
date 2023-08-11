@@ -36840,7 +36840,7 @@ const char *tcs[] = {
 void do_test(int no)
 {
     const char *t = tcs[no];
-
+    log_msg("test %d started...\n", no);
     for (int i = 0; t[i]; i++)
     {
         int ret = drv.write(&t[i], 1);
