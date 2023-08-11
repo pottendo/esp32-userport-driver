@@ -24,11 +24,9 @@
 
 //#define DUMP_TRAFFIC
 
-void udelay(unsigned long us)
+inline void udelay(unsigned long us)
 {
-    unsigned long st = micros();
-    while ((micros() - st) < us)
-        ;
+    delayMicroseconds(us);
 }
 
 /*
@@ -202,7 +200,7 @@ void pp_drv::pc2_isr(void)
             //log_msg_isr(true, "task-woken! %d\n", higherPriorityTaskWoken);
             portYIELD_FROM_ISR();
         }
-        udelay(25); // was 15, testing for soft80
+        //udelay(25); // was 15, testing for soft80
     }
 }
 
@@ -392,7 +390,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     while (digitalRead(SP2) == LOW)
     {
         log_msg("Input interfered\n");
-        delay(1);
+        udelay(500);
         was_busy = true;
         if ((millis() - t1) > 5000) // give up after 5s
         {
@@ -403,7 +401,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     }
     while (digitalRead(PA2) == HIGH)
     {
-        delay(1);
+        udelay(500);
         was_busy = true;
         if ((millis() - t1) > 5000) // give up after 5s
         {
@@ -445,7 +443,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     // qs is typically 8kB, with 64kBit/s -> 8kB/s -> ~1s maximum time.
     // in sync-mode even faster (x2)
     // plot test takes >1s => wait 2s
-    if (xQueueReceive(s2_queue, &ret, qs / 4 * portTICK_PERIOD_MS) == pdTRUE)
+    if (xQueueReceive(s2_queue, &ret, qs / 2 * portTICK_PERIOD_MS) == pdTRUE)
     {
         if (ret < 0)
         {
@@ -455,7 +453,7 @@ ssize_t pp_drv::write(const void *buf, size_t len)
     }
     else
     {
-        ret = -5;
+        ret = csent - 1;
         log_msg("write error: failed to write %d bytes, timeout (%d)\n", save_len - csent + 1, ret);
         goto out;
     }
