@@ -392,7 +392,7 @@ bool pp_drv::outchar(const char ct, bool from_isr)
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
         t = micros();
-        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 10)) // allow 1ms to pass
+        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 100)) // allow 100ms to pass
             ;
         if ((t1 = (micros() - t)) > 1000)
             log_msg_isr(from_isr, "outchar: C64 busy for %dus\n", t1);
