@@ -63,13 +63,13 @@ void pp_drv::sp2_isr(void)
     //   HIGH: ESP -> C64 possible
     if (digitalRead(SP2) == LOW)
     {
-        digitalWrite(LED_BUILTIN, LOW);
+        //digitalWrite(LED_BUILTIN, LOW);
         //log_msg_isr(true, "SP2(LOW) isr - mode C64 -> ESP\n");
         setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
     }
     else
     {
-        digitalWrite(LED_BUILTIN, HIGH);
+        //digitalWrite(LED_BUILTIN, HIGH);
         //log_msg_isr(true, "SP2(HIGH) isr - mode ESP->C64\n");
         if (in_write)   // race management for read/write conflict
         {
@@ -97,7 +97,10 @@ void pp_drv::pc2_isr(void)
         }
         //log_msg_isr(true, "%s: %c(0x%02x)\n", __FUNCTION__, (isprint(c) ? c : '~'), c);
         if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
+        {
+            log_msg_isr(true, "PC2 ISR input queue full.\n");
             blink(150, 0); // signal that we've just discarded a char
+        }
         flag_handshake();
         unsigned long to = micros();
         while (digitalRead(PA2) != HIGH)
@@ -134,7 +137,7 @@ void pp_drv::pc2_isr(void)
                 }
              
                 unsigned long to = micros();
-                while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 5000))
+                while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 2500))
                     ;
                 if ((micros() - to) > 2000) // was 500, 1850 seen once.
                 {
@@ -292,7 +295,7 @@ void pp_drv::open(void)
     in_write = false;
     csent = 0;
     to = DEFAULT_WTIMEOUT;
-    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
+    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 2, &th1);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
@@ -389,7 +392,7 @@ bool pp_drv::outchar(const char ct, bool from_isr)
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
         t = micros();
-        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 100)) // allow 1ms to pass
+        while ((digitalRead(SP2) == LOW) && ((micros() - t) < 1000 * 10)) // allow 1ms to pass
             ;
         if ((t1 = (micros() - t)) > 1000)
             log_msg_isr(from_isr, "outchar: C64 busy for %dus\n", t1);
@@ -462,7 +465,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
     while (digitalRead(SP2) == LOW)
     {
         log_msg("Input interfered\n");
-        udelay(500);
+        udelay(100);
         was_busy = true;
         if ((millis() - t1) > 5000) // give up after 5s
         {
@@ -471,9 +474,10 @@ size_t pp_drv::_write(const void *buf, size_t len)
             goto out;
         }
     }
+    t1 = millis();
     while (digitalRead(PA2) == HIGH)
     {
-        udelay(500);
+        udelay(100);
         was_busy = true;
         if ((millis() - t1) > 5000) // give up after 5s
         {

@@ -71,7 +71,7 @@ bool cr_mandel_t::run(pp_drv *drv)
     ((mandel<MTYPE> *)m)->select_start(ps);
     ((mandel<MTYPE> *)m)->select_end(pe);
 #ifdef MANDEL_LIVE_TRACK
-    log_msg("...done, sending closing $ff\n");
+    log_msg("...done, sending closing $%02x\n", c64_adafruit::plPLEND);
     aux_buf[0] = c64_adafruit::plPLEND;
     ret = drv->write(aux_buf, 1);
     if (ret != 1)
@@ -360,7 +360,7 @@ bool cr_plot_t::run(pp_drv *drv)
         log_msg("unkown plot selected, ignoring.\n");
         break;
     }
-    aux_buf[2] = 0xff;
+    aux_buf[2] = c64_adafruit::plPLEND;
     ret = drv->write(aux_buf, 4);
     if (ret != 4)
     {
