@@ -349,8 +349,12 @@ bool cr_plot_t::run(pp_drv *drv)
         }
         break;
     case 2:
-        ret = plot_af(drv);
-        goto out;
+        {
+            uint32_t to = drv->set_wtimeout(6000 * portTICK_PERIOD_MS); // fill rect takes long, no handshake between AF tests
+            ret = plot_af(drv);
+            (void) drv->set_wtimeout(to);
+            goto out;
+        }
         break;
     default:
         log_msg("unkown plot selected, ignoring.\n");

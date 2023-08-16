@@ -62,6 +62,8 @@ class pp_drv
     const int rbuf_len = 256;
     ring_buf_t<unsigned char> ring_buf{rbuf_len};
     int32_t csent;
+    uint32_t to;
+    const uint32_t DEFAULT_WTIMEOUT = 5 * portTICK_PERIOD_MS;
 #define PAR(x) (par_pins[x])
 #define PB0 PAR(_PB0)
 #define PB1 PAR(_PB1)
@@ -108,6 +110,7 @@ public:
     int writestr(String &s) { return write(s.c_str(), s.length()); }
     size_t write(const void *s, size_t len);
     size_t write(uint8_t c) { return write((const char *)(&c), 1); }
+    uint32_t set_wtimeout(uint32_t _to) { uint32_t t = to; to = _to; return t; }
     void sync4write(void);
     ssize_t read(void *buf, size_t len, bool block = true);
     int available(void) { return ring_buf.len(); }
