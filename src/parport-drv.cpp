@@ -134,7 +134,7 @@ void pp_drv::pc2_isr(void)
                 }
              
                 unsigned long to = micros();
-                while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 2500))
+                while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 5000))
                     ;
                 if ((micros() - to) > 2000) // was 500, 1850 seen once.
                 {
@@ -342,6 +342,7 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
     return count;
 }
 
+#if 0
 // also called from ISR context!
 bool pp_drv::outchar(const char ct, bool from_isr)
 {
@@ -353,7 +354,7 @@ bool pp_drv::outchar(const char ct, bool from_isr)
             (digitalRead(PA2) == HIGH)) && 
             ((micros() - t) < 1000 * 5)) // allow 5ms to pass
         ;
-    if ((t1 = (micros() - t)) > 1000)
+    if ((t1 = (micros() - t)) > 100)
         log_msg_isr(from_isr, "outchar: C64 busy for %dus\n", t1);
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
@@ -378,7 +379,7 @@ out:
     return ret;
 }
 
-#if 0
+#else
 // also called from ISR context!
 bool pp_drv::outchar(const char ct, bool from_isr)
 {
