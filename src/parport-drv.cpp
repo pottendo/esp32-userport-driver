@@ -295,7 +295,7 @@ void pp_drv::open(void)
     in_write = false;
     csent = 0;
     to = DEFAULT_WTIMEOUT;
-    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 2, &th1);
+    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
