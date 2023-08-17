@@ -163,11 +163,20 @@ public:
             aux_buf[i] = charset_p_topetcii('a' + ((i + ch++) % 27));
         }
         // delay(500);
+        unsigned long t1, t2;
+        t1 = millis();
         if ((ret = drv->write(aux_buf, b)) != b)
         {
             log_msg("write error: %d\n", ret);
             return false;
         }
+        t2 = millis();
+        float baud;
+        log_msg("sent %d chars in ", ret);
+        log_msg("%dms(", t2 - t1);
+        baud = ((float)ret) / (t2 - t1) * 8000;
+        log_msg("%.0f BAUD)\n", baud);
+
         return true;
     }
 };
@@ -206,7 +215,7 @@ public:
         t2 = millis();
         float baud = ((float)ret) / (t2 - t1) * 8000;
         int equal = cmp((uint8_t *)buf, ret);
-        log_msg("successfully read %d bytes in %ldms(%.0f BAUD) - ident = %d.\n", ret, millis() - t1, baud, equal);
+        log_msg("successfully read %d bytes in %ldms(%.0f BAUD) - %sidentical.\n", ret, millis() - t1, baud, ((equal == 0) ? "" : "not "));
         delete[] buf;
         return true;
     }

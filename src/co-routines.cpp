@@ -114,7 +114,7 @@ void cr_mandel_t::canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c
     if (ret != 5)
         log_msg("coroutine plot, write error: %d\n", ret);
     V(pixmutex);
-#else
+//#else
     const uint lineb = IMG_W / 8 * 8; // line 8 bytes per 8x8 pixel
     const uint colb = 8;              // 8 bytes per 8x8 pixel
 

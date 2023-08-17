@@ -36843,7 +36843,7 @@ void do_test(int no)
     log_msg("test %d started...\n", no);
     for (int i = 0; t[i]; i++)
     {
-        if (i < 8000) continue;
+        //if (i < 8000) continue;
         int ret = drv.write(&t[i], 1);
         if (ret != 1)
         {

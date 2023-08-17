@@ -100,7 +100,7 @@ void pp_drv::pc2_isr(void)
         }
         flag_handshake();
         unsigned long to = micros();
-        while (digitalRead(PA2) != HIGH)    // XXX Change along C64 side!
+        while (digitalRead(PA2) == HIGH)
         {
             if ((micros() - to) > 500)
             {
@@ -163,7 +163,9 @@ void pp_drv::pc2_isr(void)
             }
             csent = 0;
         }
-        if (err >= 0)
+#if 0 
+        // removce me       
+        if (0 && err >= 0)
         {
             unsigned long to = micros();
             while (digitalRead(PA2) != LOW)
@@ -179,6 +181,7 @@ void pp_drv::pc2_isr(void)
             }
             // log_msg_isr(true, "pc2 ISR handshake 2 took %dus\n", micros() - to);
         }
+#endif
         if ((err < 0) && uxQueueMessagesWaitingFromISR(tx_queue))
         {
             log_msg_isr(true, "discarding: \"");
