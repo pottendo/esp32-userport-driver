@@ -63,13 +63,11 @@ void pp_drv::sp2_isr(void)
     //   HIGH: ESP -> C64 possible
     if (digitalRead(SP2) == LOW)
     {
-        //digitalWrite(LED_BUILTIN, LOW);
-        //log_msg_isr(true, "SP2(LOW) isr - mode C64 -> ESP\n");
+        //log_msg_isr(true, "SP2(LOW) isr - mode C64->ESP\n");
         setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
     }
     else
     {
-        //digitalWrite(LED_BUILTIN, HIGH);
         //log_msg_isr(true, "SP2(HIGH) isr - mode ESP->C64\n");
         if (in_write)   // race management for read/write conflict
         {
@@ -79,7 +77,6 @@ void pp_drv::sp2_isr(void)
     }
 }
 
-/* ISRs */
 void pp_drv::pc2_isr(void)
 {
     int32_t err = 0;
@@ -103,7 +100,7 @@ void pp_drv::pc2_isr(void)
         }
         flag_handshake();
         unsigned long to = micros();
-        while (digitalRead(PA2) != HIGH)
+        while (digitalRead(PA2) != HIGH)    // XXX Change along C64 side!
         {
             if ((micros() - to) > 500)
             {
@@ -155,16 +152,11 @@ void pp_drv::pc2_isr(void)
         else
         {
             // log_msg_isr(true, "last char sent, releasing mutex\n");
-            int32_t out;
             if (err < 0)
-            {
                 log_msg_isr(true, "PC2 ISR write error, sent so far: %d bytes (%d). SHALL NEVER HAPPEN!!!", csent, err);
-                out = (csent > 0) ? csent : err;
-            }
-            else
-                out = csent;
 
-            if (xQueueSendToBackFromISR(s1_queue, &out, &higherPriorityTaskWoken) == errQUEUE_FULL)
+            // even sending 0 is OK, to enable retry
+            if (xQueueSendToBackFromISR(s1_queue, &csent, &higherPriorityTaskWoken) == errQUEUE_FULL)
             {
                 err = -101;
                 log_msg_isr(true, "PC2 ISR can't release write (%d).\n", err);
@@ -189,6 +181,7 @@ void pp_drv::pc2_isr(void)
         }
         if ((err < 0) && uxQueueMessagesWaitingFromISR(tx_queue))
         {
+            log_msg_isr(true, "discarding: \"");
             // in case of error empty queue
             while (uxQueueMessagesWaitingFromISR(tx_queue))
             {
@@ -197,13 +190,14 @@ void pp_drv::pc2_isr(void)
                                      &higherPriorityTaskWoken);
                 log_msg_isr(true, "%c(%02x), ", (isprint(c) ? c : '~'), c);
             }
-            log_msg_isr(true, "discarded. ISR emptied queue because of error %d.\n", err);
-            char out = (csent > 0) ? csent : err;
-            if (xQueueSendToBackFromISR(s1_queue, &out, &higherPriorityTaskWoken) == errQUEUE_FULL)
+            log_msg_isr(true, "\"\nISR emptied queue because of error %d.\n", err);
+            // even sending 0 is OK, to enable retry
+            if (xQueueSendToBackFromISR(s1_queue, &csent, &higherPriorityTaskWoken) == errQUEUE_FULL)
             {
                 err = -101;
                 log_msg_isr(true, "PC2 ISR can't release write (%d).\n", err);
             }
+            csent = 0;
         }
         //udelay(25); // was 15, testing for soft80
     }

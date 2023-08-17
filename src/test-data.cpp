@@ -36851,5 +36851,5 @@ void do_test(int no)
             delay(50);
         }
     }
-    log_msg("test passed.\n");
+    log_msg("test %d passed.\n", no);
 }
