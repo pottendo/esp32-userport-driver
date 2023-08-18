@@ -36837,19 +36837,30 @@ const char *tcs[] = {
     tf0, td1, td2, td3, td4
 };
 
+const int def_step = 1;     // only 1 works - flowcontrol issue?
 void do_test(int no)
 {
     const char *t = tcs[no];
-    log_msg("test %d started...\n", no);
-    for (int i = 0; t[i]; i++)
+    unsigned long t1;
+    int i;
+    uint32_t len = strlen(t);
+    log_msg("test %d with len %d started...\n", no, len);
+    t1 = millis();
+    for (i = 0; i < len;)
     {
         //if (i < 8000) continue;
-        int ret = drv.write(&t[i], 1);
-        if (ret != 1)
+        int step;
+        if ((i + def_step) < len)
+            step = def_step;
+        else
+            step = (len - i);
+        int ret = drv.write(&t[i], step);
+        if (ret != step)
         {
             log_msg("test failed: %d\n", ret);
-            delay(50);
+            break;
         }
+        i += step;
     }
-    log_msg("test %d passed.\n", no);
+    log_msg("test %d finished in %dms.\n", no, millis() - t1);
 }
