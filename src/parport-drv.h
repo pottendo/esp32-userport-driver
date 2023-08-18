@@ -63,7 +63,7 @@ class pp_drv
     ring_buf_t<unsigned char> ring_buf{rbuf_len};
     int32_t csent;
     uint32_t to;
-    const uint32_t DEFAULT_WTIMEOUT = 5 * portTICK_PERIOD_MS;
+    const uint32_t DEFAULT_WTIMEOUT = 50 * portTICK_PERIOD_MS;
 #define PAR(x) (par_pins[x])
 #define PB0 PAR(_PB0)
 #define PB1 PAR(_PB1)

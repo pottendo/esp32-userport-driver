@@ -443,6 +443,8 @@ size_t pp_drv::_write(const void *buf, size_t len)
     const char *str = static_cast<const char *>(buf);
     int32_t ret = -1;
     unsigned long t1, t2;
+    int counter_PA2 = 0;
+    int counter_SP2 = 0;
     //log_msg("write of %d chars\n", len);
     if ((len == 0) || (len >= qs))
         return -1;
@@ -456,15 +458,16 @@ size_t pp_drv::_write(const void *buf, size_t len)
         cd = c;
     log_msg("0x%02x, /*'%c'*/\n", c, cd);
 #endif
-    in_write = true;
     bool was_busy = false;
     t1 = millis();
+    t2 = micros();
     while (digitalRead(SP2) == LOW)
     {
-        log_msg("Input interfered\n");
-        udelay(100);
+        counter_SP2++;
+        //log_msg("Input interfered: %d\n", counter_SP2);
+        //udelay(25);
         was_busy = true;
-        if ((millis() - t1) > 5000) // give up after 5s
+        if ((millis() - t1) > 1000) // give up after 5s
         {
             log_msg("C64 reading too long, giving up writing...\n");
             ret = -1;
@@ -474,20 +477,22 @@ size_t pp_drv::_write(const void *buf, size_t len)
     t1 = millis();
     while (digitalRead(PA2) == HIGH)
     {
-        udelay(100);
+        counter_PA2++;
+        //log_msg("PA2 == HIGH: %d\n", counter_PA2);
+        //udelay(25);
         was_busy = true;
-        if ((millis() - t1) > 5000) // give up after 5s
+        if ((millis() - t1) > 1000) // give up after 5s
         {
             log_msg("C64 not responding, giving up...\n");
             ret = -1;
             goto out;
         }
     }
-    /* if (was_busy)
-        log_msg("C64 was busy for %ldms.\n", millis() - t1);
-    */
-    t1 = millis();
-
+#if 0
+    if (was_busy)
+        log_msg("C64 was busy for %ldus: counter PA2=%d, counter SP2=%d.\n", micros() - t2, counter_PA2, counter_SP2);
+#endif
+    in_write = true;
     setup_snd();
     if (!outchar(*str, false))
     {
@@ -527,14 +532,12 @@ size_t pp_drv::_write(const void *buf, size_t len)
         if (ret < 0)
         {
             log_msg("write error: %d\n", ret);
-            goto out;
         }
     }
     else
     {
         ret = csent - 1;
         log_msg("write error: failed to write %d bytes, timeout (%d)\n", save_len - csent + 1, ret);
-        goto out;
     }
 out:
     in_write = false;

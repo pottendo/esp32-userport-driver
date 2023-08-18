@@ -60,11 +60,20 @@ public:
         if (strncmp(cmd, name.c_str(), 4) == 0)
         {
             web_send_cmd("CoRoutine#" + name);
-            return run(drv);
+            return timed_run(drv);
         }
         return false;
     };
 
+    bool timed_run(pp_drv *drv)
+    {
+        unsigned long t1;
+        bool ret;
+        t1 = millis();
+        ret = run(drv);
+        log_msg("CoRoutine %s ran %dms\n", name.c_str(), millis() - t1);
+        return ret;
+    }
     virtual bool setup(void) = 0;
     virtual bool run(pp_drv *drv) = 0;
     // virtual void loop(void) = 0;
