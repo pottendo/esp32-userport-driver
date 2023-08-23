@@ -194,6 +194,7 @@ bool irc_t::loop(pp_drv &drv)
     {
         static char ibuf[128];
         String t;
+        uint16_t slen;
         log_msg("IRC msg '%s' len: %d\n", s.c_str(), s.length());
         annotate4irc(s);
         int it, i = 0, e = s.length();
@@ -205,19 +206,13 @@ bool irc_t::loop(pp_drv &drv)
             if ((e - i) <= 0)
                 break;
             i += 80;
-            ibuf[0] = t.length();
-            string2Xscii(ibuf + 1, t.c_str(), ASCII2PETSCII);
-            drv.sync4write();
-            log_msg("synced for write... msglen = %d...\n", ibuf[0]);
-            if ((ret = drv.write(ibuf, 1)) != 1)
+            string2Xscii(ibuf, t.c_str(), ASCII2PETSCII);
+            t.replace(0xff, '~'); // make sure end-marker is really at the end!
+            slen = t.length();
+            ibuf[slen++] = 0xff;  // end marker, increase len by 1
+            if ((ret = drv.write(ibuf, slen)) != slen)
             {
                 log_msg("len write error: %d\n", ret);
-            }
-            //log_msg("...wrote length...\n");
-            delay(1);
-            if ((ret = drv.write(ibuf + 1, ibuf[0])) != ibuf[0])
-            {
-                log_msg("data write error: %d\n", ret);
             }
             //log_msg("...and data\n");
             delay(200);
