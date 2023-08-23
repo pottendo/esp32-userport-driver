@@ -210,9 +210,13 @@ bool irc_t::loop(pp_drv &drv)
             t.replace(0xff, '~'); // make sure end-marker is really at the end!
             slen = t.length();
             ibuf[slen++] = 0xff;  // end marker, increase len by 1
-            if ((ret = drv.write(ibuf, slen)) != slen)
+            for (int r = 0; r < slen; r++)
             {
-                log_msg("len write error: %d\n", ret);
+                if ((ret = drv.write(&ibuf[r], 1)) != 1)
+                {
+                    log_msg("write error: %d\n", ret);
+                }
+                delay(5);
             }
             //log_msg("...and data\n");
             delay(200);

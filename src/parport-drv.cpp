@@ -467,7 +467,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
         //log_msg("Input interfered: %d\n", counter_SP2);
         //udelay(25);
         was_busy = true;
-        if ((millis() - t1) > 1000) // give up after 5s
+        if ((millis() - t1) > 5000) // give up after 5s
         {
             log_msg("C64 reading too long, giving up writing...\n");
             ret = -1;
@@ -481,7 +481,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
         //log_msg("PA2 == HIGH: %d\n", counter_PA2);
         //udelay(25);
         was_busy = true;
-        if ((millis() - t1) > 1000) // give up after 5s
+        if ((millis() - t1) > 5000) // give up after 5s
         {
             log_msg("C64 not responding, giving up...\n");
             ret = -1;
