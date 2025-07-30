@@ -1949,9 +1949,9 @@ ZResult ZCommand::doSerialCommand()
     return result;
   }
 
-#ifdef MQTT
   String t = sbuf.substring(0, 6);
   t.toUpperCase();
+#ifdef MQTT
   if (t == "ATMQTT")
   {
     result = (ZResult) mqtt_command(sbuf);
@@ -1964,7 +1964,7 @@ ZResult ZCommand::doSerialCommand()
   {
     int testno = sbuf.substring(6, sbuf.length()).toInt();
     do_test(testno);
-    return (ZResult)ZOK2;
+    return (ZResult)ZOK; // was ZOK2
   }
   t = sbuf.substring(0, 7);
   if (t == "AT+COPS")

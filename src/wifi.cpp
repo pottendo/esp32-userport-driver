@@ -50,7 +50,7 @@ static const String hostname = "esp32coC64";
 static void printLocalTime()
 {
     struct tm timeinfo;
-    int err = 10;
+    int err = 1;
     while (!getLocalTime(&timeinfo) && err--)
     {
         log_msg("Failed to obtain time - " + String(10 - err));

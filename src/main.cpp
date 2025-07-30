@@ -28,7 +28,7 @@
 
 void setup()
 {
-    Serial.begin(115200);
+    Serial.begin(921600);
     printf("Disabling brownout...\n");
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // disable brownout detector, needed for my AzDelivery ESP32 Mini D1 module
     setup_log();

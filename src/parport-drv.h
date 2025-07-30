@@ -34,6 +34,7 @@ class pp_drv
     TaskHandle_t th1, th2;
     bool verbose;
     bool in_write = false;
+    bool block_ack = false;
     // enum to enable iteration over all pins
     typedef enum
     {
@@ -49,17 +50,18 @@ class pp_drv
         _PC2,
         _SP2,
         _FLAG,
-        _OE
+        _OE,
+        _BUSY
     } par_pins_t;
-//    const uint8_t par_pins[13] = {13, 4, 16, 17, 5, 18, 19, 32 /*22*/, 23, 25 /*21*/, 27, 15, 26};
-    const uint8_t par_pins[13] = {32, 19, 18, 5, 17, 16, 4, 13, 23, 25 /*21*/, 27, 15, 26};
+//    const uint8_t par_pins[14] = {13, 4, 16, 17, 5, 18, 19, 32 /*22*/, 23, 25 /*21*/, 27, 15, 26, 12};
+    const uint8_t par_pins[14] = {32, 19, 18, 5, 17, 16, 4, 13, 23, 25 /*21*/, 27, 15, 26, 26};
     QueueHandle_t rx_queue;
     QueueHandle_t tx_queue;
     QueueHandle_t s1_queue;
     QueueHandle_t s2_queue;
 
     uint8_t mode;
-    const int rbuf_len = 256;
+    const int rbuf_len = MAX_AUX;
     ring_buf_t<unsigned char> ring_buf{rbuf_len};
     int32_t csent;
     uint32_t to;
@@ -78,6 +80,7 @@ class pp_drv
 #define SP2 PAR(_SP2)
 #define FLAG PAR(_FLAG)
 #define OE PAR(_OE)
+#define BUSY PAR(_BUSY)
 
 protected:
     static void th_wrapper1(void *t);
@@ -94,8 +97,10 @@ protected:
     void drv_body();
     inline void flag_handshake(void)
     {
-        digitalWrite(FLAG, HIGH);
         digitalWrite(FLAG, LOW);
+        //udelay(1);
+        digitalWrite(FLAG, HIGH);
+        digitalWrite(BUSY, LOW);
     }
     
 public:

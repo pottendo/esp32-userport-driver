@@ -30,7 +30,6 @@ public:
 
 inline void blink(uint32_t ms = 100, int count = 1)
 {
-    pinMode(2, OUTPUT);
     if (count == 0)
     {
         digitalWrite(2, !digitalRead(2));
