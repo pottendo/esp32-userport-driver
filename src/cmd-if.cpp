@@ -309,7 +309,7 @@ void loop_cmd()
     {
         static int8_t rc = 0;
         int lb = 0;
-        static char strout[64];
+        static char strout[256];
         strout[0] = '\0';
         // log_msg("Waiting for command from c64...\n");
         unsigned long t1, t2;
@@ -324,10 +324,10 @@ void loop_cmd()
                 log_msg("error\n");
                 return;
             }
-#if 0            
-            for (int i = 0; i < ret; i++)
+#if 1            
+            for (int i = 0; i < 8; i++)
             {
-                char t[8];
+                char t[64];
                 snprintf(t, 8, "%02x ", buf[i]);
                 strcat(strout, t);
             }

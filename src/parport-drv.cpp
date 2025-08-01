@@ -43,6 +43,11 @@ void IRAM_ATTR pp_drv::isr_wrapper_pc2(void)
     active_drv->pc2_isr();
 }
 
+void IRAM_ATTR pp_drv::isr_wrapper_select(void)
+{
+    active_drv->select_isr();
+}
+
 void pp_drv::th_wrapper1(void *t)
 {
     pp_drv *drv = static_cast<pp_drv *>(t);
@@ -75,6 +80,28 @@ void pp_drv::sp2_isr(void)
             setup_snd();
         }
     }
+}
+
+void pp_drv::select_isr(void)
+{
+    // select signaled by Amiga:
+    //   LOW: ESP -> Amiga
+    //   HIGH: Amiga -> ESP 
+    if (digitalRead(SELECT) == HIGH)
+    {
+        log_msg_isr(true, "SELECT(HIGH) isr - mode Amiga->ESP\n");
+        //setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
+    }
+    else
+    {
+        log_msg_isr(true, "SELECT(LOW) isr - mode ESP->Amiga\n");
+        if (in_write)   // race management for read/write conflict
+        {
+            log_msg_isr(true, "read/write race: SP2(HIGH) isr - mode ESP->C64\n");
+            setup_snd();
+        }
+    }
+
 }
 
 void pp_drv::pc2_isr(void)
@@ -321,6 +348,7 @@ void pp_drv::open(void)
     pinMode(PA2, INPUT);
     pinMode(PC2, INPUT_PULLUP);
     pinMode(SP2, INPUT);
+    pinMode(SELECT, INPUT);
     pinMode(FLAG, OUTPUT);
     pinMode(2, OUTPUT);
     digitalWrite(FLAG, HIGH);
@@ -332,6 +360,7 @@ void pp_drv::open(void)
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
 
     //pinMode(OE, OUTPUT);

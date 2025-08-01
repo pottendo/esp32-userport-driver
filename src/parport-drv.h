@@ -51,10 +51,11 @@ class pp_drv
         _SP2,
         _FLAG,
         _OE,
-        _BUSY
+        _BUSY,
+        _SELECT
     } par_pins_t;
 //    const uint8_t par_pins[14] = {13, 4, 16, 17, 5, 18, 19, 32 /*22*/, 23, 25 /*21*/, 27, 15, 26, 12};
-    const uint8_t par_pins[14] = {32, 19, 18, 5, 17, 16, 4, 13, 23, 25 /*21*/, 27, 15, 26, 26};
+    const uint8_t par_pins[15] = {32, 19, 18, 5, 17, 16, 4, 13, 23, 25 /*21*/, 27, 15, 26, 26, 27};
     QueueHandle_t rx_queue;
     QueueHandle_t tx_queue;
     QueueHandle_t s1_queue;
@@ -81,15 +82,18 @@ class pp_drv
 #define FLAG PAR(_FLAG)
 #define OE PAR(_OE)
 #define BUSY PAR(_BUSY)
+#define SELECT PAR(_SELECT)
 
 protected:
     static void th_wrapper1(void *t);
     static void th_wrapper2(void *t);
     static void isr_wrapper_sp2(void);
+    static void isr_wrapper_select(void);
     static void isr_wrapper_pc2(void);
     static pp_drv *active_drv;
 
     void sp2_isr(void);
+    void select_isr(void);
     void pc2_isr(void);
     void drv_ackrcv(void);
     bool outchar(const char c, bool from_isr);
