@@ -40,7 +40,7 @@ void IRAM_ATTR pp_drv::isr_wrapper_sp2(void)
 
 void IRAM_ATTR pp_drv::isr_wrapper_pc2(void)
 {
-    active_drv->pc2_isr();
+    active_drv->pc2_isr_amiga();
 }
 
 void IRAM_ATTR pp_drv::isr_wrapper_select(void)
@@ -104,7 +104,7 @@ void pp_drv::select_isr(void)
 
 }
 
-void pp_drv::pc2_isr(void)
+void pp_drv::pc2_isr_amiga(void)
 {
     int32_t err = 0;
     BaseType_t higherPriorityTaskWoken = pdFALSE;

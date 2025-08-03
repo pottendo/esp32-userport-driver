@@ -94,7 +94,7 @@ protected:
 
     void sp2_isr(void);
     void select_isr(void);
-    void pc2_isr(void);
+    void pc2_isr_amiga(void);
     void drv_ackrcv(void);
     bool outchar(const char c, bool from_isr);
     size_t _write(const void *s, size_t len);
