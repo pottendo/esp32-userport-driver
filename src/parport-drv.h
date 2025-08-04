@@ -47,9 +47,9 @@ class pp_drv
         _PB6,
         _PB7,
         _PA2,
-        _PC2,
+        _PC2,   // STROBE
         _SP2,
-        _FLAG,
+        _FLAG,  // ACK
         _OE,
         _BUSY,
         _SELECT
@@ -95,16 +95,20 @@ protected:
     void sp2_isr(void);
     void select_isr(void);
     void pc2_isr_amiga(void);
+    void pc2_isr_c64(void);
     void drv_ackrcv(void);
     bool outchar(const char c, bool from_isr);
     size_t _write(const void *s, size_t len);
     void drv_body();
-    inline void flag_handshake(void)
+    inline void flag_handshake_amiga(void)
     {
         digitalWrite(FLAG, LOW);
-        //udelay(1);
         digitalWrite(FLAG, HIGH);
-        digitalWrite(BUSY, LOW);
+    }
+    inline void flag_handshake(void)
+    {
+        digitalWrite(FLAG, HIGH);
+        digitalWrite(FLAG, LOW);
     }
     
 public:

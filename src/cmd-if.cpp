@@ -309,11 +309,36 @@ void loop_cmd()
     {
         static int8_t rc = 0;
         int lb = 0;
-        static char strout[256];
+        static char strout[CHUNK];
         strout[0] = '\0';
         // log_msg("Waiting for command from c64...\n");
         unsigned long t1, t2;
         t1 = t2 = millis();
+        for (int i = 0; i < CHUNK; i++)
+            strout[i] = i;
+        while (1)
+        {
+            ret = drv.write(strout, CHUNK);
+            if (ret != CHUNK)
+            {
+                log_msg("write error: %d\n", ret);
+            }
+            if (lb == 64000 / CHUNK)
+            {
+                t2 = millis();
+                float baud;
+                log_msg("sent %d chars in ", lb * CHUNK);
+                log_msg("%dms(", t2 - t1);
+                baud = ((float)lb * CHUNK) / (t2 - t1) * 8000;
+                log_msg("%.0f BAUD)\n", baud);
+                lb = 0;
+                t1 = millis();
+            }
+            lb++;
+            //delay(10);
+        }
+        break;
+
         log_msg("hexdump: ");
         while (1)
         {
