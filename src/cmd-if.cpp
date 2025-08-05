@@ -292,7 +292,7 @@ void setup_cmd()
     change_mode(uCCoRoutine);
 }
 
-#define CHUNK 128
+#define CHUNK 8000
 void loop_cmd()
 {
     uCmode_t mode = get_mode();
@@ -314,30 +314,6 @@ void loop_cmd()
         // log_msg("Waiting for command from c64...\n");
         unsigned long t1, t2;
         t1 = t2 = millis();
-        for (int i = 0; i < CHUNK; i++)
-            strout[i] = (i & 0xff);
-        while (1)
-        {
-            ret = drv.write(strout, CHUNK);
-            if (ret != CHUNK)
-            {
-                log_msg("write error: %d\n", ret);
-            }
-            if (lb == 64000 / CHUNK)
-            {
-                t2 = millis();
-                float baud;
-                log_msg("sent %d chars in ", lb * CHUNK);
-                log_msg("%dms(", t2 - t1);
-                baud = ((float)lb * CHUNK) / (t2 - t1) * 8000;
-                log_msg("%.0f BAUD)\n", baud);
-                lb = 0;
-                t1 = millis();
-            }
-            lb++;
-            //delay(500);
-        }
-        break;
 
         log_msg("hexdump: ");
         while (1)
@@ -371,6 +347,31 @@ void loop_cmd()
                 t1 = millis();
             }
             lb++;
+        }
+        break;
+
+        for (int i = 0; i < CHUNK; i++)
+            strout[i] = (i & 0xff);
+        while (1)
+        {
+            ret = drv.write(strout, CHUNK);
+            if (ret != CHUNK)
+            {
+                log_msg("write error: %d\n", ret);
+            }
+            if (lb == 64000 / CHUNK)
+            {
+                t2 = millis();
+                float baud;
+                log_msg("sent %d chars in ", lb * CHUNK);
+                log_msg("%dms(", t2 - t1);
+                baud = ((float)lb * CHUNK) / (t2 - t1) * 8000;
+                log_msg("%.0f BAUD)\n", baud);
+                lb = 0;
+                t1 = millis();
+            }
+            lb++;
+            //delay(500);
         }
         break;
 

@@ -90,6 +90,7 @@ void pp_drv::sp2_isr(void)
         {
             //log_msg_isr(true, "read/write race: SP2(HIGH) isr - mode ESP->C64\n");
             setup_snd();
+            digitalWrite(2, ~digitalRead(2));
         }
     }
 }
@@ -475,7 +476,7 @@ void pp_drv::open(void)
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
-    //attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
 
     //pinMode(OE, OUTPUT);
@@ -680,38 +681,27 @@ size_t pp_drv::_write(const void *buf, size_t len)
     in_write = true;
     setup_snd();
     csent = 0;
-    UBaseType_t no;
-    while ((no = uxQueueSpacesAvailable(tx_queue)) < len)
+    if (!outchar(*str, false))
     {
-        log_msg("%s: txqueue full: %d, need %d\n", __FUNCTION__, no, len);
-        delay(2);
-    }
-    //log_msg("no = %d, qs = %d\n", no, qs);
-    if (no == qs)
-    {
+        log_msg("write error %db, retrying...\n", len);
         if (!outchar(*str, false))
         {
-            log_msg("write error %db, retrying...\n", len);
-            if (!outchar(*str, false))
-            {
-                ret = -4;
-                log_msg("presistent write error: %d bytes not written (%d).\n", len, ret);
-                goto out;
-            }
-            log_msg("...oisdaun, ged eh!\n");
+            ret = -4;
+            log_msg("presistent write error: %d bytes not written (%d).\n", len, ret);
+            goto out;
         }
-        csent++;
-        len--;
-        str++;
+        log_msg("...oisdaun, ged eh!\n");
     }
+    csent++;
+    len--;
+    str++;
     while (len--)
     {
         if (xQueueSend(tx_queue, str, DEFAULT_WTIMEOUT) != pdTRUE)
             log_msg("xQueueSend failed for %c, remaining: %d\n", *str, len);
         str++;
     }
-    if (no == qs)
-        flag_handshake();
+    flag_handshake();
 
     // qs is typically 8kB, with 60-64kBit/s -> 8kB/s -> ~1s maximum time.
     // in sync-mode even faster (x2)
