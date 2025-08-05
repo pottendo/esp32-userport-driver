@@ -292,7 +292,7 @@ void setup_cmd()
     change_mode(uCCoRoutine);
 }
 
-#define CHUNK 8000
+#define CHUNK 128
 void loop_cmd()
 {
     uCmode_t mode = get_mode();
@@ -315,7 +315,7 @@ void loop_cmd()
         unsigned long t1, t2;
         t1 = t2 = millis();
         for (int i = 0; i < CHUNK; i++)
-            strout[i] = i;
+            strout[i] = (i & 0xff);
         while (1)
         {
             ret = drv.write(strout, CHUNK);
@@ -335,7 +335,7 @@ void loop_cmd()
                 t1 = millis();
             }
             lb++;
-            //delay(10);
+            //delay(500);
         }
         break;
 

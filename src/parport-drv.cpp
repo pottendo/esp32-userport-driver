@@ -26,6 +26,7 @@
 #ifdef AMIGA
 #define WRIND SELECT
 #define WRITING HIGH
+#define flag_handshake ack_handshake
 #else
 #define WRIND SP2
 #define WRITING LOW
@@ -268,7 +269,7 @@ void pp_drv::pc2_isr_amiga(void)
             if ((micros() - to) > 500)
             {
                 log_msg_isr(true, "/STROBE not deasserted for >500us.\n");
-                blink(150, 0);
+                blink(150, 2);
                 break;
             }
         }
@@ -279,7 +280,7 @@ void pp_drv::pc2_isr_amiga(void)
             if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
             {
                 log_msg_isr(true, "/STROBE ISR input queue full.\n");
-                blink(150, 0); // signal that we've just discarded a char
+                blink(150, 3); // signal that we've just discarded a char
             }
 
             // blink(50);
@@ -303,8 +304,8 @@ void pp_drv::pc2_isr_amiga(void)
             if ((micros() - to) > 500)
             {
                 log_msg_isr(true, "PC2 ISR input handshake (PA2==LOW) - host not responding (-1).\n");
-                err = -1; // nothing happens with err during INPUT
-                blink(150, 0);
+                err = -1; 
+                blink(150, 4);
                 break;
             }
         }
@@ -313,11 +314,10 @@ void pp_drv::pc2_isr_amiga(void)
         char c;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
-
             //log_msg_isr(true, "pc2 isr - output1 - %d pending\n", uxQueueMessagesWaitingFromISR(tx_queue));
             if (xQueueReceiveFromISR(tx_queue, (void *)&c, &higherPriorityTaskWoken) == pdTRUE)
             {
-                // log_msg_isr(true, "would send from ISR" + c + '\n');
+                //log_msg_isr(true, "would send from ISR" + c + '\n');
                 if (outchar(c, true))
                 {
                     csent++;
@@ -352,19 +352,18 @@ void pp_drv::pc2_isr_amiga(void)
             csent = 0;
             digitalWrite(BUSY, LOW); // ok ready for the next byte
         }
-        if ((err < 0) && uxQueueMessagesWaitingFromISR(tx_queue))
+        if (err < 0)
         {
-            log_msg_isr(true, "discarding: \"");
+            UBaseType_t no = uxQueueMessagesWaitingFromISR(tx_queue);
             // in case of error empty queue
-            while (uxQueueMessagesWaitingFromISR(tx_queue))
+            log_msg_isr(true, "ISR emptied queue (%d bytes) because of error %d.\n", no, err);
+            while (no--)
             {
                 xQueueReceiveFromISR(tx_queue,
                                      (void *)&c,
                                      &higherPriorityTaskWoken);
-                log_msg_isr(true, "%c(%02x), ", (isprint(c) ? c : '~'), c);
+                //log_msg_isr(true, "%c(%02x), ", (isprint(c) ? c : '~'), c);
             }
-            log_msg_isr(true, "\"\nISR emptied queue because of error %d.\n", err);
-            // even sending 0 is OK, to enable retry
             if (xQueueSendToBackFromISR(s1_queue, &csent, &higherPriorityTaskWoken) == errQUEUE_FULL)
             {
                 err = -101;
@@ -476,7 +475,7 @@ void pp_drv::open(void)
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
+    //attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
 
     //pinMode(OE, OUTPUT);
@@ -645,7 +644,6 @@ size_t pp_drv::_write(const void *buf, size_t len)
 #endif
     bool was_busy = false;
     t1 = millis();
-    t2 = micros();
     while (digitalRead(WRIND) == WRITING)
     {
         counter_SP2++;
@@ -681,34 +679,46 @@ size_t pp_drv::_write(const void *buf, size_t len)
 #endif
     in_write = true;
     setup_snd();
-    if (!outchar(*str, false))
+    csent = 0;
+    UBaseType_t no;
+    while ((no = uxQueueSpacesAvailable(tx_queue)) < len)
     {
-        log_msg("write error %db, retrying...\n", len);
+        log_msg("%s: txqueue full: %d, need %d\n", __FUNCTION__, no, len);
+        delay(2);
+    }
+    //log_msg("no = %d, qs = %d\n", no, qs);
+    if (no == qs)
+    {
         if (!outchar(*str, false))
         {
-            ret = -4;
-            log_msg("presistent write error: %d bytes not written (%d).\n", len, ret);
-            goto out;
+            log_msg("write error %db, retrying...\n", len);
+            if (!outchar(*str, false))
+            {
+                ret = -4;
+                log_msg("presistent write error: %d bytes not written (%d).\n", len, ret);
+                goto out;
+            }
+            log_msg("...oisdaun, ged eh!\n");
         }
-        log_msg("...oisdaun, ged eh!\n");
+        csent++;
+        len--;
+        str++;
     }
-    csent = 1;
-    str++;
-    len--;
     while (len--)
     {
         if (xQueueSend(tx_queue, str, DEFAULT_WTIMEOUT) != pdTRUE)
             log_msg("xQueueSend failed for %c, remaining: %d\n", *str, len);
         str++;
     }
-    flag_handshake();
+    if (no == qs)
+        flag_handshake();
 
     // qs is typically 8kB, with 60-64kBit/s -> 8kB/s -> ~1s maximum time.
     // in sync-mode even faster (x2)
     uint32_t _to;
     if (to == DEFAULT_WTIMEOUT)
     {
-        uint32_t t = (save_len / 8) * portTICK_PERIOD_MS;
+        uint32_t t = (save_len / 4) * portTICK_PERIOD_MS;
         _to = std::max(DEFAULT_WTIMEOUT, t);
     }
     else
@@ -725,7 +735,6 @@ size_t pp_drv::_write(const void *buf, size_t len)
     }
     else
     {
-        log_msg("write error: %d, r=%d\n", ret, r);
         ret = csent - 1;
         log_msg("write error: failed to write %d bytes, timeout (%d)\n", save_len - csent + 1, ret);
     }
