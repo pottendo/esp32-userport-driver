@@ -262,36 +262,37 @@ void pp_drv::pc2_isr_amiga(void)
             c = (c << 1) | b;
         }
         digitalWrite(FLAG, LOW); // start ACK
-        UBaseType_t itemsWaiting = uxQueueMessagesWaitingFromISR(rx_queue);
-        if ((qs - itemsWaiting) > 0)
+        unsigned long to = micros();
+        while (digitalRead(PC2) == LOW) // wait until /STROBE is de-asserted
+        {
+            if ((micros() - to) > 500)
+            {
+                log_msg_isr(true, "/STROBE not deasserted for >500us.\n");
+                blink(150, 0);
+                break;
+            }
+        }
+        UBaseType_t fr, itemsWaiting = uxQueueMessagesWaitingFromISR(rx_queue);
+        if ((fr = (qs - itemsWaiting)) > 0)
         {
             // log_msg_isr(true, "%s: %c(0x%02x)\n", __FUNCTION__, (isprint(c) ? c : '~'), c);
             if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
             {
-                log_msg_isr(true, "PC2 ISR input queue full.\n");
+                log_msg_isr(true, "/STROBE ISR input queue full.\n");
                 blink(150, 0); // signal that we've just discarded a char
             }
-            unsigned long to = micros();
-            while (digitalRead(PC2) == LOW) // wait until /STROBE is de-asserted
-            {
-                if ((micros() - to) > 500)
-                {
-                    log_msg_isr(true, "PC2 ISR input handshake (PA2==LOW) - host not responding (-1).\n");
-                    err = -1; // nothing happens with err during INPUT
-                    blink(150, 0);
-                    break;
-                }
-            }
+
             // blink(50);
-            digitalWrite(BUSY, LOW); // ok ready for the next byte
+            if (fr == 1) // now nothing is free anymore
+            {
+                digitalWrite(2, HIGH); // indicate congestion and wait until queue is sufficiently empty (hysteresis)
+                block_ack = true;
+            }
+            else
+                digitalWrite(BUSY, LOW); // ok ready for the next byte
         }
-        else
-        {
-            digitalWrite(2, HIGH);  // indicate congestion and wait until queue is sufficiently empty (hysteresis)
-            block_ack = true;
-        }
-        digitalWrite(FLAG, HIGH);   // finish ACK
-        //blink(150, 0);
+        digitalWrite(FLAG, HIGH); // finish ACK
+        // blink(150, 0);
     }
     if (mode == OUTPUT)
     {
