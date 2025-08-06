@@ -714,9 +714,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
     else
         _to = to;
     
-    BaseType_t r;
-    ret = -42;
-    if ((r = xQueueReceive(s2_queue, &ret, _to)) == pdTRUE)
+    if (xQueueReceive(s2_queue, &ret, _to) == pdTRUE)
     {
         if (ret < 0)
         {
@@ -725,8 +723,11 @@ size_t pp_drv::_write(const void *buf, size_t len)
     }
     else
     {
+        char c;
         ret = csent - 1;
-        log_msg("write error: failed to write %d bytes, timeout (%d)\n", save_len - csent + 1, ret);
+        log_msg("write error: failed to write %d bytes (%db sent), timeout, discarding\n", save_len - csent + 1, ret);
+        while (uxQueueMessagesWaiting(tx_queue))
+            xQueueReceive(tx_queue, (void *)&c, portTICK_PERIOD_MS);
     }
 out:
     in_write = false;
