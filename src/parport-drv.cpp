@@ -22,6 +22,13 @@
 #include "misc.h"
 #include "logger.h"
 
+#ifdef PAR2I2C
+#include <Wire.h>
+#include <PCF8574.h>
+PCF8574 pcf(0x20);
+#endif
+
+
 //#define DUMP_TRAFFIC
 #ifdef AMIGA
 #define WRIND SELECT
@@ -258,11 +265,13 @@ void pp_drv::pc2_isr_amiga(void)
         int i;
         c = 0;
 
+#ifndef PAR2I2C
         for (i = _PB7; i >= _PB0; i--)
         {
             char b = (digitalRead(PAR(i)) == LOW) ? 0 : 1;
             c = (c << 1) | b;
         }
+#endif        
         digitalWrite(FLAG, LOW); // start ACK
         unsigned long to = micros();
         while (digitalRead(PC2) == LOW) // wait until /STROBE is de-asserted
@@ -290,8 +299,10 @@ void pp_drv::pc2_isr_amiga(void)
                 digitalWrite(2, HIGH); // indicate congestion and wait until queue is sufficiently empty (hysteresis)
                 block_ack = true;
             }
+#ifndef PAR2I2C            
             else
                 digitalWrite(BUSY, LOW); // ok ready for the next byte
+#endif                
         }
         digitalWrite(FLAG, HIGH); // finish ACK
         // blink(150, 0);
@@ -411,6 +422,10 @@ void pp_drv::drv_body(void)
         while (xQueueReceive(rx_queue, &c, portMAX_DELAY) == pdTRUE)
         {
             //log_msg("pp - rcv: '%c'/0x%02x\n", (c? c : '~'), c);
+#ifdef PAR2I2C            
+            c = pcf.read8();
+            digitalWrite(BUSY, LOW); // ok ready for the next byte
+#endif
             ring_buf.put(c);
             if (block_ack && (uxQueueSpacesAvailable( rx_queue ) > MAX_AUX - 1))
             {
@@ -485,6 +500,11 @@ void pp_drv::open(void)
     pinMode(BUSY, OUTPUT);
     digitalWrite(BUSY, LOW);
 
+#ifdef PAR2I2C
+    Wire.begin();
+    Wire.setClock(400000UL);
+    pcf.begin();
+#endif
     setup_rcv();
 }
 

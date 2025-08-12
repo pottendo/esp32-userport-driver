@@ -375,6 +375,7 @@ void loop_cmd()
         }
         break;
 
+
         ret = drv.read(buf + rc, 4 - rc, false);
         if (ret < 0)
         {

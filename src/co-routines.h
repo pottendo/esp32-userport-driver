@@ -264,7 +264,7 @@ public:
                 char cpet = charset_p_topetcii(c);
                 if ((ret = drv->write(&cpet, 1)) != 1)
                 {
-                    log_msg("read error: %d\n", ret);
+                    log_msg("write error: %d\n", ret);
                     return false;
                 }
                 sent++;
