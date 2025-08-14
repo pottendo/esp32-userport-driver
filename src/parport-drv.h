@@ -21,6 +21,7 @@
 
 #include <Arduino.h>
 #include <list>
+#include <driver/gpio.h>
 #include "misc.h"
 #include "logger.h"
 
@@ -55,7 +56,12 @@ class pp_drv
         _SELECT
     } par_pins_t;
 //    const uint8_t par_pins[14] = {13, 4, 16, 17, 5, 18, 19, 32 /*22*/, 23, 25 /*21*/, 27, 15, 26, 12};
-    const uint8_t par_pins[15] = {32, 19, 18, 5, 17, 16, 4, 13, 23, 25 /*21*/, 27, 15, 26, 26, 27};
+    const gpio_num_t par_pins[15] = 
+        {   static_cast<gpio_num_t>(32), static_cast<gpio_num_t>(19), static_cast<gpio_num_t>(18), 
+            static_cast<gpio_num_t>(5), static_cast<gpio_num_t>(17), static_cast<gpio_num_t>(16), 
+            static_cast<gpio_num_t>(4), static_cast<gpio_num_t>(13), static_cast<gpio_num_t>(23), 
+            static_cast<gpio_num_t>(25) /*21*/, static_cast<gpio_num_t>(27), static_cast<gpio_num_t>(15), 
+            static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(27)};
     QueueHandle_t rx_queue;
     QueueHandle_t tx_queue;
     QueueHandle_t s1_queue;

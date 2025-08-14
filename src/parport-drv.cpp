@@ -254,6 +254,7 @@ void pp_drv::pc2_isr_c64(void)
         portYIELD_FROM_ISR();
 }
 
+#ifdef NOT_OPTIMIZEIO
 void pp_drv::pc2_isr_amiga(void)
 {
     int32_t err = 0;
@@ -389,6 +390,128 @@ void pp_drv::pc2_isr_amiga(void)
     if (higherPriorityTaskWoken != pdFALSE)
         portYIELD_FROM_ISR();
 }
+#else
+
+void pp_drv::pc2_isr_amiga(void)
+{
+    int32_t err = 0;
+    BaseType_t higherPriorityTaskWoken = pdFALSE;
+    gpio_set_level(BUSY, 1);   // tell we're busy now
+    if (mode == INPUT)
+    {
+        char c = 0;
+        int i;
+
+#ifndef PAR2I2C
+        for (i = _PB7; i >= _PB0; i--)
+        {
+            char b = (gpio_get_level(PAR(i)) == 0) ? 0 : 1;
+            c = (c << 1) | b;
+        }
+#endif        
+        gpio_set_level(FLAG, 0); // start ACK
+        unsigned long to = micros();
+        while (gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
+        {
+            if ((micros() - to) > 500)
+            {
+                log_msg_isr(true, "/STROBE not deasserted for >500us.\n");
+                blink(150, 2);
+                break;
+            }
+        }
+        UBaseType_t fr, itemsWaiting = uxQueueMessagesWaitingFromISR(rx_queue);
+        if ((fr = (qs - itemsWaiting)) > 0)
+        {
+            if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
+            {
+                log_msg_isr(true, "/STROBE ISR input queue full.\n");
+                blink(150, 3);
+            }
+            if (fr == 1)
+            {
+                gpio_set_level(static_cast<gpio_num_t>(2), 1); // indicate congestion
+                block_ack = true;
+            }
+#ifndef PAR2I2C            
+            else
+                gpio_set_level(BUSY, 0); // ok ready for the next byte
+#endif                
+        }
+        gpio_set_level(FLAG, 1); // finish ACK
+    }
+    if (mode == OUTPUT)
+    {
+        unsigned long to = micros();
+        while (gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
+        {
+            if ((micros() - to) > 500)
+            {
+                log_msg_isr(true, "PC2 ISR input handshake (PA2==LOW) - host not responding (-1).\n");
+                err = -1; 
+                blink(150, 4);
+                break;
+            }
+        }
+        BaseType_t higherPriorityTaskWoken = pdFALSE;
+        char c;
+        if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
+        {
+            if (xQueueReceiveFromISR(tx_queue, (void *)&c, &higherPriorityTaskWoken) == pdTRUE)
+            {
+                if (outchar(c, true))
+                {
+                    csent++;
+                    flag_handshake();
+                } 
+                else
+                {
+                    log_msg_isr(true, "PC2 ISR write error (-1).\n");
+                    err = -1;
+                    gpio_set_level(BUSY, 0);
+                }
+            }
+            else
+            {
+                err = -100;
+                log_msg_isr(true, "PC2 ISR xQueueReceive failed (%d).\n", err);
+                gpio_set_level(BUSY, 0);
+            }
+        }
+        else
+        {
+            if (err < 0)
+                log_msg_isr(true, "PC2 ISR write error, sent so far: %d bytes (%d). SHALL NEVER HAPPEN!!!", csent, err);
+
+            if (xQueueSendToBackFromISR(s1_queue, &csent, &higherPriorityTaskWoken) == errQUEUE_FULL)
+            {
+                err = -101;
+                log_msg_isr(true, "PC2 ISR can't release write (%d).\n", err);
+            }
+            csent = 0;
+            gpio_set_level(BUSY, 0);
+        }
+        if (err < 0)
+        {
+            UBaseType_t no = uxQueueMessagesWaitingFromISR(tx_queue);
+            log_msg_isr(true, "ISR emptied queue (%d bytes) because of error %d.\n", no, err);
+            while (no--)
+            {
+                xQueueReceiveFromISR(tx_queue, (void *)&c, &higherPriorityTaskWoken);
+            }
+            if (xQueueSendToBackFromISR(s1_queue, &csent, &higherPriorityTaskWoken) == errQUEUE_FULL)
+            {
+                err = -101;
+                log_msg_isr(true, "PC2 ISR can't release write (%d).\n", err);
+            }
+            csent = 0;
+            gpio_set_level(BUSY, 0);
+        }
+    }
+    if (higherPriorityTaskWoken != pdFALSE)
+        portYIELD_FROM_ISR();
+}
+#endif // NOT_OPTIMIZEIO
 
 /*
  * member functions
@@ -453,6 +576,7 @@ void pp_drv::drv_ackrcv(void)
     }
 }
 
+#ifdef NOT_OPTIMIZEIO
 void pp_drv::setup_snd(void)
 {
     //log_msg("C64 Terminal - sender");
@@ -507,6 +631,84 @@ void pp_drv::open(void)
 #endif
     setup_rcv();
 }
+#else
+#include "driver/gpio.h"
+
+void pp_drv::setup_snd(void)
+{
+#pragma GCC unroll 8
+    for (uint8_t i = _PB0; i <= _PB7; i++)
+    {
+        gpio_set_direction(PAR(i), GPIO_MODE_OUTPUT);
+        gpio_set_level(PAR(i), 0);
+    }
+    mode = OUTPUT;
+}
+
+void pp_drv::setup_rcv(void)
+{
+#pragma GCC unroll 8    
+    for (uint8_t i = _PB0; i <= _PB7; i++)
+    {
+        gpio_set_direction(PAR(i), GPIO_MODE_INPUT);
+        // Optionally set pull mode if needed:
+        gpio_set_pull_mode(PAR(i), GPIO_PULLUP_ONLY);
+    }
+    mode = INPUT;
+}
+
+void pp_drv::open(void)
+{
+    // One-time pad selection for parallel port pins
+    for (uint8_t i = _PB0; i <= _PB7; i++)
+    {
+        gpio_pad_select_gpio(PAR(i));
+    }
+
+    // Other pins
+    gpio_pad_select_gpio(PA2);
+    gpio_pad_select_gpio(PC2);
+    gpio_pad_select_gpio(SP2);
+    gpio_pad_select_gpio(SELECT);
+    gpio_pad_select_gpio(FLAG);
+    gpio_pad_select_gpio(2);
+    gpio_pad_select_gpio(BUSY);
+
+    // Now set directions and pull modes for non-parallel pins
+    gpio_set_direction(PA2, GPIO_MODE_INPUT);
+    gpio_set_direction(PC2, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(PC2, GPIO_PULLUP_ONLY);
+    gpio_set_direction(SP2, GPIO_MODE_INPUT);
+    gpio_set_direction(SELECT, GPIO_MODE_INPUT);
+    gpio_set_direction(FLAG, GPIO_MODE_OUTPUT);
+    gpio_set_direction(static_cast<gpio_num_t>(2), GPIO_MODE_OUTPUT);
+    gpio_set_direction(BUSY, GPIO_MODE_OUTPUT);
+
+    gpio_set_level(FLAG, 1);
+    gpio_set_level(BUSY, 0);
+
+    mode = INPUT;
+    in_write = false;
+    csent = 0;
+    to = DEFAULT_WTIMEOUT;
+    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
+    xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
+    delay(50); // give logger time to setup everything before first interrupts happen
+    attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
+
+#ifdef PAR2I2C
+    Wire.begin();
+    Wire.setClock(400000UL);
+    pcf.begin();
+#endif
+    setup_rcv();
+}
+
+
+#endif
+
 
 void pp_drv::close(void)
 {
@@ -584,7 +786,7 @@ out:
 }
 
 #else
-
+#ifdef NOT_OPTIMIZEIO
 // also called from ISR context!
 bool pp_drv::outchar(const char ct, bool from_isr)
 {
@@ -614,6 +816,37 @@ bool pp_drv::outchar(const char ct, bool from_isr)
     //log_msg("\n");
     return ret;
 }
+
+#else
+// also called from ISR context!
+bool pp_drv::outchar(const char ct, bool from_isr)
+{
+    unsigned long t, t1;
+    bool ret = true;
+    for (uint8_t s = _PB0; s <= _PB7; s++)
+    {
+        t = micros();
+        while ((gpio_get_level(WRIND) == WRITING) && ((micros() - t) < 1000 * 100)) // allow 100ms to pass
+            ;
+        if ((t1 = (micros() - t)) > 1000)
+            log_msg_isr(from_isr, "outchar: host busy for %dus\n", t1);
+        if (gpio_get_level(WRIND) != WRITING)
+        {
+            uint8_t bit = (ct & (1 << s)) ? 1 : 0;
+            //log_msg("%c", (bit ? '1' : '0'));
+            gpio_set_level(PAR(s), bit);
+        }
+        else
+        {
+            log_msg_isr(from_isr, "host is writing - cowardly refusing to write.\n");
+            ret = false;
+            break;
+        }
+    }
+    //log_msg("\n");
+    return ret;
+}
+#endif
 #endif
 
 size_t pp_drv::write(const void *buf, size_t len)
