@@ -36,6 +36,7 @@ class pp_drv
     bool verbose;
     bool in_write = false;
     bool block_ack = false;
+    bool is_amiga = false;
     // enum to enable iteration over all pins
     typedef enum
     {
@@ -53,15 +54,18 @@ class pp_drv
         _FLAG,  // ACK
         _OE,
         _BUSY,
-        _SELECT
+        _SELECT,
+        _POUT,  // POUT, used to tell ESP->Amiga direction
+        _RESET  // /RESET
     } par_pins_t;
 //    const uint8_t par_pins[14] = {13, 4, 16, 17, 5, 18, 19, 32 /*22*/, 23, 25 /*21*/, 27, 15, 26, 12};
-    const gpio_num_t par_pins[15] = 
+    const gpio_num_t par_pins[17] = 
         {   static_cast<gpio_num_t>(32), static_cast<gpio_num_t>(19), static_cast<gpio_num_t>(18), 
-            static_cast<gpio_num_t>(5), static_cast<gpio_num_t>(17), static_cast<gpio_num_t>(16), 
-            static_cast<gpio_num_t>(4), static_cast<gpio_num_t>(13), static_cast<gpio_num_t>(23), 
-            static_cast<gpio_num_t>(25) /*21*/, static_cast<gpio_num_t>(27), static_cast<gpio_num_t>(15), 
-            static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(27)};
+            static_cast<gpio_num_t>( 5), static_cast<gpio_num_t>(17), static_cast<gpio_num_t>(16), 
+            static_cast<gpio_num_t>( 4), static_cast<gpio_num_t>(13), static_cast<gpio_num_t>(23), 
+            static_cast<gpio_num_t>(25), static_cast<gpio_num_t>(27), static_cast<gpio_num_t>(15), 
+            static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(27),
+            static_cast<gpio_num_t>(14), static_cast<gpio_num_t>(33)};
     QueueHandle_t rx_queue;
     QueueHandle_t tx_queue;
     QueueHandle_t s1_queue;
@@ -89,6 +93,8 @@ class pp_drv
 #define OE PAR(_OE)
 #define BUSY PAR(_BUSY)
 #define SELECT PAR(_SELECT)
+#define POUT PAR(_POUT)
+#define RESET PAR(_RESET)
 
 protected:
     static void th_wrapper1(void *t);
@@ -96,10 +102,12 @@ protected:
     static void isr_wrapper_sp2(void);
     static void isr_wrapper_select(void);
     static void isr_wrapper_pc2(void);
+    static void isr_wrapper_reset(void);
     static pp_drv *active_drv;
 
     void sp2_isr(void);
     void select_isr(void);
+    void reset_isr(void);
     void pc2_isr_amiga(void);
     void pc2_isr_c64(void);
     void drv_ackrcv(void);

@@ -67,6 +67,11 @@ void IRAM_ATTR pp_drv::isr_wrapper_select(void)
     active_drv->select_isr();
 }
 
+void IRAM_ATTR pp_drv::isr_wrapper_reset(void)
+{
+    active_drv->reset_isr();
+}
+
 void pp_drv::th_wrapper1(void *t)
 {
     pp_drv *drv = static_cast<pp_drv *>(t);
@@ -117,10 +122,15 @@ void pp_drv::select_isr(void)
         //log_msg_isr(true, "SELECT(LOW) isr - mode ESP->Amiga\n");
         if (in_write)   // race management for read/write conflict
         {
-            //log_msg_isr(true, "read/write race: SELECT(LOW) isr - mode ESP->host\n");
+            log_msg_isr(true, "read/write race: SELECT(LOW) isr - mode ESP->host\n");
             setup_snd();
         }
     }
+}
+
+void pp_drv::reset_isr(void)
+{
+    log_msg_isr(true, "Amiga RESET\n");
 }
 
 void pp_drv::pc2_isr_c64(void)
@@ -280,7 +290,7 @@ void pp_drv::pc2_isr_amiga(void)
             if ((micros() - to) > 500)
             {
                 log_msg_isr(true, "/STROBE not deasserted for >500us.\n");
-                blink(150, 2);
+                //blink(150, 2);
                 break;
             }
         }
@@ -399,16 +409,25 @@ void pp_drv::pc2_isr_amiga(void)
     gpio_set_level(BUSY, 1);   // tell we're busy now
     if (mode == INPUT)
     {
-        char c = 0;
+        char c1 = 0;
+        char c2 = 0;
         int i;
 
 #ifndef PAR2I2C
-        for (i = _PB7; i >= _PB0; i--)
+        do
         {
-            char b = (gpio_get_level(PAR(i)) == 0) ? 0 : 1;
-            c = (c << 1) | b;
-        }
-#endif        
+            for (i = _PB7; i >= _PB0; i--)
+            {
+                char b1 = (gpio_get_level(PAR(i)) == 0) ? 0 : 1;
+                c1 = (c1 << 1) | b1;
+            }
+            for (i = _PB7; i >= _PB0; i--)
+            {
+                char b1 = (gpio_get_level(PAR(i)) == 0) ? 0 : 1;
+                c2 = (c2 << 1) | b1;
+            }
+        } while (c1 != c2);
+#endif
         gpio_set_level(FLAG, 0); // start ACK
         unsigned long to = micros();
         while (gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
@@ -416,14 +435,14 @@ void pp_drv::pc2_isr_amiga(void)
             if ((micros() - to) > 500)
             {
                 log_msg_isr(true, "/STROBE not deasserted for >500us.\n");
-                blink(150, 2);
+                //blink(150, 2);
                 break;
             }
         }
         UBaseType_t fr, itemsWaiting = uxQueueMessagesWaitingFromISR(rx_queue);
         if ((fr = (qs - itemsWaiting)) > 0)
         {
-            if (xQueueSendToBackFromISR(rx_queue, &c, &higherPriorityTaskWoken) == errQUEUE_FULL)
+            if (xQueueSendToBackFromISR(rx_queue, &c1, &higherPriorityTaskWoken) == errQUEUE_FULL)
             {
                 log_msg_isr(true, "/STROBE ISR input queue full.\n");
                 blink(150, 3);
@@ -636,6 +655,7 @@ void pp_drv::open(void)
 
 void pp_drv::setup_snd(void)
 {
+    gpio_set_level(POUT, HIGH); // tell other side we are ready to write
 #pragma GCC unroll 8
     for (uint8_t i = _PB0; i <= _PB7; i++)
     {
@@ -652,9 +672,10 @@ void pp_drv::setup_rcv(void)
     {
         gpio_set_direction(PAR(i), GPIO_MODE_INPUT);
         // Optionally set pull mode if needed:
-        gpio_set_pull_mode(PAR(i), GPIO_PULLUP_ONLY);
+        gpio_set_pull_mode(PAR(i), GPIO_FLOATING);
     }
     mode = INPUT;
+    gpio_set_level(POUT, LOW); // enable other side to write
 }
 
 void pp_drv::open(void)
@@ -673,6 +694,8 @@ void pp_drv::open(void)
     gpio_pad_select_gpio(FLAG);
     gpio_pad_select_gpio(2);
     gpio_pad_select_gpio(BUSY);
+    gpio_pad_select_gpio(POUT);
+    gpio_pad_select_gpio(RESET);
 
     // Now set directions and pull modes for non-parallel pins
     gpio_set_direction(PA2, GPIO_MODE_INPUT);
@@ -680,12 +703,16 @@ void pp_drv::open(void)
     gpio_set_pull_mode(PC2, GPIO_PULLUP_ONLY);
     gpio_set_direction(SP2, GPIO_MODE_INPUT);
     gpio_set_direction(SELECT, GPIO_MODE_INPUT);
+    gpio_set_direction(RESET, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(RESET, GPIO_PULLDOWN_ONLY);
+
     gpio_set_direction(FLAG, GPIO_MODE_OUTPUT);
     gpio_set_direction(static_cast<gpio_num_t>(2), GPIO_MODE_OUTPUT);
     gpio_set_direction(BUSY, GPIO_MODE_OUTPUT);
-
+    gpio_set_direction(POUT, GPIO_MODE_OUTPUT);
     gpio_set_level(FLAG, 1);
     gpio_set_level(BUSY, 0);
+    gpio_set_level(POUT, 0);
 
     mode = INPUT;
     in_write = false;
@@ -697,6 +724,7 @@ void pp_drv::open(void)
     attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
+    //attachInterrupt(digitalPinToInterrupt(RESET), isr_wrapper_reset, FALLING); // doesn't work on Amiga, so not used
 
 #ifdef PAR2I2C
     Wire.begin();
@@ -704,9 +732,18 @@ void pp_drv::open(void)
     pcf.begin();
 #endif
     setup_rcv();
+
+    is_amiga = false;
+    if (gpio_get_level(RESET) == HIGH)
+    {
+        log_msg("Amiga detected...\n");
+        is_amiga = true;
+    }
+    else
+    {
+        log_msg("C64 detected...\n");
+    }
 }
-
-
 #endif
 
 
