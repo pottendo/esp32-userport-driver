@@ -22,13 +22,6 @@
 #include "misc.h"
 #include "logger.h"
 
-#ifdef PAR2I2C
-#include <Wire.h>
-#include <PCF8574.h>
-PCF8574 pcf(0x20);
-#endif
-
-
 //#define DUMP_TRAFFIC
 #ifdef AMIGA
 #define WRIND SELECT
@@ -110,8 +103,8 @@ void pp_drv::sp2_isr(void)
 void pp_drv::select_isr(void)
 {
     // select signaled by Amiga:
-    //   LOW: ESP -> Amiga
-    //   HIGH: Amiga -> ESP 
+    //   HIGH: Amiga writes
+    //   LOW: Amiga idle or read
     if (digitalRead(SELECT) == HIGH)
     {
         //log_msg_isr(true, "SELECT(HIGH) isr - mode Amiga->ESP\n");
@@ -122,7 +115,7 @@ void pp_drv::select_isr(void)
         //log_msg_isr(true, "SELECT(LOW) isr - mode ESP->Amiga\n");
         if (in_write)   // race management for read/write conflict
         {
-            log_msg_isr(true, "read/write race: SELECT(LOW) isr - mode ESP->host\n");
+            //log_msg_isr(true, "read/write race: SELECT(LOW) isr - mode ESP->host\n");
             setup_snd();
         }
     }
@@ -276,13 +269,11 @@ void pp_drv::pc2_isr_amiga(void)
         int i;
         c = 0;
 
-#ifndef PAR2I2C
         for (i = _PB7; i >= _PB0; i--)
         {
             char b = (digitalRead(PAR(i)) == LOW) ? 0 : 1;
             c = (c << 1) | b;
         }
-#endif        
         digitalWrite(FLAG, LOW); // start ACK
         unsigned long to = micros();
         while (digitalRead(PC2) == LOW) // wait until /STROBE is de-asserted
@@ -310,10 +301,8 @@ void pp_drv::pc2_isr_amiga(void)
                 digitalWrite(2, HIGH); // indicate congestion and wait until queue is sufficiently empty (hysteresis)
                 block_ack = true;
             }
-#ifndef PAR2I2C            
             else
                 digitalWrite(BUSY, LOW); // ok ready for the next byte
-#endif                
         }
         digitalWrite(FLAG, HIGH); // finish ACK
         // blink(150, 0);
@@ -410,24 +399,13 @@ void pp_drv::pc2_isr_amiga(void)
     if (mode == INPUT)
     {
         char c1 = 0;
-        char c2 = 0;
         int i;
 
-#ifndef PAR2I2C
-        do
+        for (i = _PB7; i >= _PB0; i--)
         {
-            for (i = _PB7; i >= _PB0; i--)
-            {
-                char b1 = (gpio_get_level(PAR(i)) == 0) ? 0 : 1;
-                c1 = (c1 << 1) | b1;
-            }
-            for (i = _PB7; i >= _PB0; i--)
-            {
-                char b1 = (gpio_get_level(PAR(i)) == 0) ? 0 : 1;
-                c2 = (c2 << 1) | b1;
-            }
-        } while (c1 != c2);
-#endif
+            char b1 = (gpio_get_level(PAR(i)) == 0) ? 0 : 1;
+            c1 = (c1 << 1) | b1;
+        }
         gpio_set_level(FLAG, 0); // start ACK
         unsigned long to = micros();
         while (gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
@@ -445,17 +423,15 @@ void pp_drv::pc2_isr_amiga(void)
             if (xQueueSendToBackFromISR(rx_queue, &c1, &higherPriorityTaskWoken) == errQUEUE_FULL)
             {
                 log_msg_isr(true, "/STROBE ISR input queue full.\n");
-                blink(150, 3);
+                //blink(150, 3);
             }
             if (fr == 1)
             {
                 gpio_set_level(static_cast<gpio_num_t>(2), 1); // indicate congestion
                 block_ack = true;
             }
-#ifndef PAR2I2C            
             else
                 gpio_set_level(BUSY, 0); // ok ready for the next byte
-#endif                
         }
         gpio_set_level(FLAG, 1); // finish ACK
     }
@@ -468,11 +444,12 @@ void pp_drv::pc2_isr_amiga(void)
             {
                 log_msg_isr(true, "PC2 ISR input handshake (PA2==LOW) - host not responding (-1).\n");
                 err = -1; 
-                blink(150, 4);
+                //blink(150, 4);
                 break;
             }
         }
         BaseType_t higherPriorityTaskWoken = pdFALSE;
+        //log_msg_isr(true, "csent %d bytes (err = %d)\n", csent, err);
         char c;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
@@ -564,10 +541,6 @@ void pp_drv::drv_body(void)
         while (xQueueReceive(rx_queue, &c, portMAX_DELAY) == pdTRUE)
         {
             //log_msg("pp - rcv: '%c'/0x%02x\n", (c? c : '~'), c);
-#ifdef PAR2I2C            
-            c = pcf.read8();
-            digitalWrite(BUSY, LOW); // ok ready for the next byte
-#endif
             ring_buf.put(c);
             if (block_ack && (uxQueueSpacesAvailable( rx_queue ) > MAX_AUX - 1))
             {
@@ -643,11 +616,6 @@ void pp_drv::open(void)
     pinMode(BUSY, OUTPUT);
     digitalWrite(BUSY, LOW);
 
-#ifdef PAR2I2C
-    Wire.begin();
-    Wire.setClock(400000UL);
-    pcf.begin();
-#endif
     setup_rcv();
 }
 #else
@@ -655,7 +623,7 @@ void pp_drv::open(void)
 
 void pp_drv::setup_snd(void)
 {
-    gpio_set_level(POUT, HIGH); // tell other side we are ready to write
+    digitalWrite(BUSY, HIGH);
 #pragma GCC unroll 8
     for (uint8_t i = _PB0; i <= _PB7; i++)
     {
@@ -675,7 +643,7 @@ void pp_drv::setup_rcv(void)
         gpio_set_pull_mode(PAR(i), GPIO_FLOATING);
     }
     mode = INPUT;
-    gpio_set_level(POUT, LOW); // enable other side to write
+    digitalWrite(BUSY, LOW);
 }
 
 void pp_drv::open(void)
@@ -709,10 +677,10 @@ void pp_drv::open(void)
     gpio_set_direction(FLAG, GPIO_MODE_OUTPUT);
     gpio_set_direction(static_cast<gpio_num_t>(2), GPIO_MODE_OUTPUT);
     gpio_set_direction(BUSY, GPIO_MODE_OUTPUT);
-    gpio_set_direction(POUT, GPIO_MODE_OUTPUT);
+    //gpio_set_direction(POUT, GPIO_MODE_OUTPUT);
     gpio_set_level(FLAG, 1);
     gpio_set_level(BUSY, 0);
-    gpio_set_level(POUT, 0);
+    //gpio_set_level(POUT, 0);
 
     mode = INPUT;
     in_write = false;
@@ -721,16 +689,11 @@ void pp_drv::open(void)
     xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
-    attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
+    //attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
     //attachInterrupt(digitalPinToInterrupt(RESET), isr_wrapper_reset, FALLING); // doesn't work on Amiga, so not used
 
-#ifdef PAR2I2C
-    Wire.begin();
-    Wire.setClock(400000UL);
-    pcf.begin();
-#endif
     setup_rcv();
 
     is_amiga = false;
@@ -894,10 +857,10 @@ size_t pp_drv::write(const void *buf, size_t len)
     t1 = millis();
     do {
         ret = _write((const char *)buf + wlen, len - wlen);
-        if (ret < 0) 
+        if (ret < len) 
         {
-            log_msg("write error, ret = %d\n", ret);
-            return wlen;
+            //log_msg("write error, ret = %d\n", ret);
+            return ret;
         }
         wlen += ret;
     } while (wlen < len);   // unless some real error arrives, retry until full length is written
@@ -1016,6 +979,8 @@ size_t pp_drv::_write(const void *buf, size_t len)
         char c;
         ret = csent - 1;
         log_msg("write error: failed to write %d bytes (%db sent), timeout, discarding\n", save_len - csent + 1, ret);
+        if (ret == 0) 
+            ret = -ETIMEDOUT;
         while (uxQueueMessagesWaiting(tx_queue))
             xQueueReceive(tx_queue, (void *)&c, portTICK_PERIOD_MS);
     }

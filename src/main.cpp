@@ -25,6 +25,7 @@
 #include "misc.h"
 #include "cmd-if.h"
 #include "wifi.h"
+#include "ssd1306-display.h"
 
 void setup()
 {
@@ -32,6 +33,7 @@ void setup()
     printf("Disabling brownout...\n");
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // disable brownout detector, needed for my AzDelivery ESP32 Mini D1 module
     setup_log();
+    setup_display();
     setup_wifi();
     setup_cmd();
 }

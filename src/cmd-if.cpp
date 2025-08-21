@@ -314,7 +314,6 @@ void loop_cmd()
         // log_msg("Waiting for command from c64...\n");
         unsigned long t1, t2;
         t1 = t2 = millis();
-
         log_msg("hexdump: ");
         while (1)
         {

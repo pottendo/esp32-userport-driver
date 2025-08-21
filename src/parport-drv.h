@@ -63,9 +63,9 @@ class pp_drv
         {   static_cast<gpio_num_t>(32), static_cast<gpio_num_t>(19), static_cast<gpio_num_t>(18), 
             static_cast<gpio_num_t>( 5), static_cast<gpio_num_t>(17), static_cast<gpio_num_t>(16), 
             static_cast<gpio_num_t>( 4), static_cast<gpio_num_t>(13), static_cast<gpio_num_t>(23), 
-            static_cast<gpio_num_t>(25), static_cast<gpio_num_t>(27), static_cast<gpio_num_t>(15), 
-            static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(27),
-            static_cast<gpio_num_t>(14), static_cast<gpio_num_t>(33)};
+            static_cast<gpio_num_t>(25), static_cast<gpio_num_t>(14), static_cast<gpio_num_t>(15), 
+            static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(14),
+            static_cast<gpio_num_t>(27), static_cast<gpio_num_t>(33)};
     QueueHandle_t rx_queue;
     QueueHandle_t tx_queue;
     QueueHandle_t s1_queue;
