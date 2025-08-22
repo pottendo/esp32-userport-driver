@@ -118,14 +118,19 @@ public:
     {
         char c;
         int idx = 0, j;
-        log_msg("reading echo arg...\n");
-        while (drv->read(&c, 1))
+        int ret;
+        //log_msg("reading echo arg...\n");
+        while (((ret = drv->read(&c, 1)) == 1) && idx < (MAX_AUX - 1))
         {
             aux_buf[idx++] = c;
             if (c == '\0')
                 break;
         }
-        int ret;
+        if (ret != 1)
+        {
+            log_msg("read error: %d\n", ret);
+            return false;
+        }
         idx--;
         static char flip_buf[128];
         j = 0;
@@ -134,8 +139,8 @@ public:
             flip_buf[j++] = aux_buf[i];
         }
         flip_buf[j] = '\0';
-        log_msg("sending back '%s'.\n", flip_buf);
-        if ((ret = drv->write(flip_buf, idx)) != idx)
+        log_msg("ECHO '%s' -> '%s'\n", aux_buf, flip_buf);
+        if ((ret = drv->write(flip_buf, strlen(flip_buf))) != idx)
             log_msg("write error: %d\n", ret);
         return true;
     }
@@ -226,6 +231,100 @@ public:
         int equal = cmp((uint8_t *)buf, ret);
         log_msg("successfully read %d bytes in %ldms(%.0f BAUD) - %sidentical.\n", ret, millis() - t1, baud, ((equal == 0) ? "" : "not "));
         delete[] buf;
+        return true;
+    }
+};
+
+class cr_dump3_t : public cr_base
+{
+    size_t chunk_size;
+public:
+    cr_dump3_t(const char *n, size_t cs) : cr_base(String{n}), chunk_size(cs) { reg(); }
+    ~cr_dump3_t() = default;
+
+    bool setup(void) override { return true; };
+    bool run(pp_drv *drv) override
+    {
+        int lb = 0;
+        int ret;
+        int end = 16;
+
+        static char strout[128];
+        strout[0] = '\0';
+        unsigned long t1, t2;
+        t1 = t2 = millis();
+        do
+        {
+            ret = drv->read(aux_buf, chunk_size, true);
+            if (ret < 0)
+            {
+                log_msg("%s: read error %d\n", __FUNCTION__, ret);
+                return false;
+            }
+#if 1            
+            for (int i = 0; i < 8; i++)
+            {
+                char t[64];
+                snprintf(t, 8, "%02x ", aux_buf[i]);
+                strcat(strout, t);
+            }
+            printf("%s - %d\n", strout, lb);
+            strout[0] = '\0';
+#endif
+            if (lb == 64000 / chunk_size)
+            {
+                t2 = millis();
+                float baud;
+                log_msg("rcvd %d chars in ", lb * chunk_size);
+                log_msg("%dms(", t2 - t1);
+                baud = ((float)lb * chunk_size) / (t2 - t1) * 8000;
+                log_msg("%.0f BAUD)\n", baud);
+                lb = 0;
+                t1 = millis();
+            }
+            lb++;
+        } while (--end);
+        return true;
+    }
+};
+
+class cr_dump4_t : public cr_base
+{
+    size_t chunk_size;
+public:
+    cr_dump4_t(const char *n, size_t cs) : cr_base(String{n}), chunk_size(cs) { reg(); }
+    ~cr_dump4_t() = default;
+
+    bool setup(void) override { return true; };
+    bool run(pp_drv *drv) override
+    {
+        int ret, lb = 0;
+        int end = 16;
+        unsigned long t1, t2;
+        t1 = t2 = millis();
+        for (int i = 0; i < chunk_size; i++)
+            aux_buf[i] = (i & 0xff);
+        do
+        {
+            ret = drv->write(aux_buf, chunk_size);
+            if (ret != chunk_size)
+            {
+                log_msg("%s: write error: %d\n", __FUNCTION__, ret);
+                return false;
+            }
+            if (lb == 64000 / chunk_size)
+            {
+                t2 = millis();
+                float baud;
+                log_msg("sent %d chars in ", lb * chunk_size);
+                log_msg("%dms(", t2 - t1);
+                baud = ((float)lb * chunk_size) / (t2 - t1) * 8000;
+                log_msg("%.0f BAUD)\n", baud);
+                lb = 0;
+                t1 = millis();
+            }
+            lb++;
+        } while (--end);  
         return true;
     }
 };

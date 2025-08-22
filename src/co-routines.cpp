@@ -15,6 +15,8 @@ void setup_cr(void)
     new cr_dump_t{"DUM1"};
     new cr_read_t{"READ"};
     new cr_dump2_t{"DUM2"};
+    new cr_dump3_t{"DUM3", 8000};
+    new cr_dump4_t{"DUM4", 8000};
 #ifdef IRC_CRED
     new cr_irc_t{"IRC_"};
 #endif

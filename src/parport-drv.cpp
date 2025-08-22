@@ -901,14 +901,13 @@ size_t pp_drv::_write(const void *buf, size_t len)
     while (digitalRead(WRIND) == WRITING)
     {
         counter_SP2++;
-        //log_msg("Input interfered: %d\n", counter_SP2);
-        //udelay(25);
         was_busy = true;
         if ((millis() - t1) > 5000) // give up after 5s
         {
-            log_msg("host reading too long, giving up writing...\n");
-            ret = -1;
-            goto out;
+            log_msg("waiting for host to read...\n");
+            t1 = millis();
+            //ret = -1;
+            //goto out;
         }
     }
 #ifndef AMIGA
@@ -939,7 +938,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
         log_msg("write error %db, retrying...\n", len);
         if (!outchar(*str, false))
         {
-            ret = -4;
+            ret = -EBUSY;
             log_msg("presistent write error: %d bytes not written (%d).\n", len, ret);
             goto out;
         }

@@ -292,7 +292,6 @@ void setup_cmd()
     change_mode(uCCoRoutine);
 }
 
-#define CHUNK 8000
 void loop_cmd()
 {
     uCmode_t mode = get_mode();
@@ -308,71 +307,6 @@ void loop_cmd()
     case uCCoRoutine:
     {
         static int8_t rc = 0;
-        int lb = 0;
-        static char strout[CHUNK];
-        strout[0] = '\0';
-        // log_msg("Waiting for command from c64...\n");
-        unsigned long t1, t2;
-        t1 = t2 = millis();
-        log_msg("hexdump: ");
-        while (1)
-        {
-            ret = drv.read(buf, CHUNK, true);
-            if (ret < 0)
-            {
-                V(cmd_mutex);
-                log_msg("error\n");
-                return;
-            }
-#if 1            
-            for (int i = 0; i < 8; i++)
-            {
-                char t[64];
-                snprintf(t, 8, "%02x ", buf[i]);
-                strcat(strout, t);
-            }
-            printf("%s - %d\n", strout, lb);
-            strout[0] = '\0';
-#endif
-            if (lb == 64000 / CHUNK)
-            {
-                t2 = millis();
-                float baud;
-                log_msg("rcvd %d chars in ", lb * CHUNK);
-                log_msg("%dms(", t2 - t1);
-                baud = ((float)lb * CHUNK) / (t2 - t1) * 8000;
-                log_msg("%.0f BAUD)\n", baud);
-                lb = 0;
-                t1 = millis();
-            }
-            lb++;
-        }
-        break;
-
-        for (int i = 0; i < CHUNK; i++)
-            strout[i] = (i & 0xff);
-        while (1)
-        {
-            ret = drv.write(strout, CHUNK);
-            if (ret != CHUNK)
-            {
-                log_msg("write error: %d\n", ret);
-            }
-            if (lb == 64000 / CHUNK)
-            {
-                t2 = millis();
-                float baud;
-                log_msg("sent %d chars in ", lb * CHUNK);
-                log_msg("%dms(", t2 - t1);
-                baud = ((float)lb * CHUNK) / (t2 - t1) * 8000;
-                log_msg("%.0f BAUD)\n", baud);
-                lb = 0;
-                t1 = millis();
-            }
-            lb++;
-            //delay(500);
-        }
-        break;
         ret = drv.read(buf + rc, 4 - rc, false);
         if (ret < 0)
         {
