@@ -23,6 +23,7 @@
 #include "logger.h"
 #include "irc.h"
 #include "html.h"
+#include "ssd1306-display.h"
 
 void setup_cr(void);
 void loop_cr(void);
@@ -60,6 +61,7 @@ public:
         if (strncmp(cmd, name.c_str(), 4) == 0)
         {
             web_send_cmd("CoRoutine#" + name);
+            lcd->printf("CoRoutine %s\n", name.c_str());
             return timed_run(drv);
         }
         return false;

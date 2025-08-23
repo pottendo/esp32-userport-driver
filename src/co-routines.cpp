@@ -54,15 +54,59 @@ bool cr_mandel_t::setup()
     return true;
 }
 
+static void hexdump(const char *buf, int len)
+{
+    int i;
+    int idx = 0;
+    int lines = 0;
+    char linestr[256];
+
+    while (len > 0) {
+        for (i = 0; i < 16; i++) {
+            if (i < len) {
+                char t[4];
+                snprintf(t, 4, "%02x ", (uint8_t) buf[idx + i]);
+                strcat(linestr, t);
+            } else {
+                strcat(linestr, "   ");
+            }
+        }
+        strcat(linestr, "|");
+        for (i = 0; i < 16; i++) {
+            if (i < len) {
+                char t[2];
+                char c;
+                if (((unsigned char)buf[idx + i] > 31) && /* avoid tabs and other printable ctrl chars) */
+                    isprint((unsigned char)buf[idx + i])) {
+                    c= buf[idx + i];
+                } else {
+                    c = '.';
+                }
+                snprintf(t, 2, "%c", c);
+                strcat(linestr, t);
+            } else {
+                strcat(linestr, " ");
+            }
+        }
+        strcat(linestr, "|");
+        log_msg("%s\n", linestr);
+        idx += 16;
+        len -= 16;
+    }
+}
+
 bool cr_mandel_t::run(pp_drv *drv)
 {
     int ret;
+    log_msg("Coroutine mandel\n");
     ret = drv->read(aux_buf, 6);
     if (ret != 6)
     {
         log_msg("mandel parm incomplete: %d\n", ret);
         return false;
     }
+    hexdump(aux_buf, 6);
+    
     point_t ps{aux_buf[0] + aux_buf[1] * 256, aux_buf[2]};
     point_t pe{aux_buf[3] + aux_buf[4] * 256, aux_buf[5]};
     ps.x /= PIXELW;

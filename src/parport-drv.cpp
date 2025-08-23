@@ -17,10 +17,12 @@
  */
 
 #include <Arduino.h>
+#include <Adafruit_SSD1306.h>
 #include <ctype.h>
 #include "parport-drv.h"
 #include "misc.h"
 #include "logger.h"
+#include "ssd1306-display.h"
 
 //#define DUMP_TRAFFIC
 #ifdef AMIGA
@@ -697,15 +699,19 @@ void pp_drv::open(void)
     setup_rcv();
 
     is_amiga = false;
+    char *machine;
     if (gpio_get_level(RESET) == HIGH)
     {
         log_msg("Amiga detected...\n");
         is_amiga = true;
+        machine = (char *)"Amiga";
     }
     else
     {
         log_msg("C64 detected...\n");
+        machine = (char *)"C64";
     }
+    lcd->printf("%s detected...\n", machine);
 }
 #endif
 
