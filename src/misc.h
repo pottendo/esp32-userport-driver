@@ -32,7 +32,8 @@ inline void blink(uint32_t ms = 100, int count = 1)
 {
     if (count == 0)
     {
-        digitalWrite(2, !digitalRead(2));
+        static int state = 0;
+        digitalWrite(2, ++state % 2);
         return;
     }
     for (int i = 0; i < count; i++)

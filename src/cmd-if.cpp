@@ -290,6 +290,7 @@ void setup_cmd()
 
     zisetup_parallel();
     change_mode(uCCoRoutine);
+    //change_mode(uCZiModem);
 }
 
 void loop_cmd()
@@ -316,7 +317,7 @@ void loop_cmd()
             return;
         }
         rc += ret;
-        buf[rc] = '\0';
+        //buf[rc] = '\0';
         //log_msg("ret = %d, rc = %d, buf = '%s'\n", ret, rc, buf);
         if (rc >= 4)
         {

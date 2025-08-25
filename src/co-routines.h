@@ -61,7 +61,8 @@ public:
         if (strncmp(cmd, name.c_str(), 4) == 0)
         {
             web_send_cmd("CoRoutine#" + name);
-            lcd->printf("CoRoutine %s\n", name.c_str());
+            if (name != "ARIT")
+                lcd->printf("CoRoutine %s\n", name.c_str());
             return timed_run(drv);
         }
         return false;
@@ -178,7 +179,7 @@ public:
         {
             aux_buf[i] = charset_p_topetcii('a' + ((i + ch++) % 27));
         }
-        // delay(500);
+        //delay(500);
         unsigned long t1, t2;
         t1 = millis();
         if ((ret = drv->write(aux_buf, b)) != b)
