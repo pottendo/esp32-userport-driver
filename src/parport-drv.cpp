@@ -701,6 +701,7 @@ void pp_drv::open(void)
         is_amiga = true;
         machine = (char *)"Amiga";
         attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
+        attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_strobe, FALLING);
         //attachInterrupt(digitalPinToInterrupt(RESET), isr_wrapper_reset, FALLING); // doesn't work on Amiga, so not used
     }
     else
@@ -708,12 +709,12 @@ void pp_drv::open(void)
         log_msg("C64 detected...\n");
         machine = (char *)"C64";
         attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
+        attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
         lcd->orientation(2); // upside down for C64
     }
     lcd->printf("%s detected...\n", machine);
 
-    attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
-
+    
     setup_rcv();
 
 }
