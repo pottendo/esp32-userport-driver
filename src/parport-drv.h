@@ -102,13 +102,14 @@ protected:
     static void isr_wrapper_sp2(void);
     static void isr_wrapper_select(void);
     static void isr_wrapper_pc2(void);
+    static void isr_wrapper_strobe(void);
     static void isr_wrapper_reset(void);
     static pp_drv *active_drv;
 
     void sp2_isr(void);
     void select_isr(void);
     void reset_isr(void);
-    void pc2_isr_amiga(void);
+    void strobe_isr_amiga(void);
     void pc2_isr_c64(void);
     void drv_ackrcv(void);
     bool outchar(const char c, bool from_isr);

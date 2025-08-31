@@ -50,12 +50,12 @@ void IRAM_ATTR pp_drv::isr_wrapper_sp2(void)
 
 void IRAM_ATTR pp_drv::isr_wrapper_pc2(void)
 {
-#ifdef AMIGA
-//    active_drv->pc2_isr_amiga();
     active_drv->pc2_isr_c64();
-#else    
-    active_drv->pc2_isr_c64();
-#endif
+}
+
+void IRAM_ATTR pp_drv::isr_wrapper_strobe(void)
+{
+    active_drv->strobe_isr_amiga();
 }
 
 void IRAM_ATTR pp_drv::isr_wrapper_select(void)
@@ -169,6 +169,7 @@ void pp_drv::pc2_isr_c64(void)
         BaseType_t higherPriorityTaskWoken = pdFALSE;
         // log_msg_isr(true, "pc2 isr - output1 - %d\n", higherPriorityTaskWoken);
         char c;
+#if 0        
         unsigned long to = micros();
         while (0 && gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
         {
@@ -180,6 +181,7 @@ void pp_drv::pc2_isr_c64(void)
             blink(0, 0);
             log_msg_isr(true, "/PC2 not deasserted...\n");
         }
+#endif       
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
             if (xQueueReceiveFromISR(tx_queue, (void *)&c, &higherPriorityTaskWoken) == pdTRUE)
@@ -389,7 +391,7 @@ void pp_drv::pc2_isr_amiga(void)
 }
 #else
 
-void pp_drv::pc2_isr_amiga(void)
+void pp_drv::strobe_isr_amiga(void)
 {
     int32_t err = 0;
     BaseType_t higherPriorityTaskWoken = pdFALSE;
@@ -691,30 +693,29 @@ void pp_drv::open(void)
     xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
     xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
     delay(50); // give logger time to setup everything before first interrupts happen
-    attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
-    //attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
-    //attachInterrupt(digitalPinToInterrupt(RESET), isr_wrapper_reset, FALLING); // doesn't work on Amiga, so not used
-
-    setup_rcv();
-
     is_amiga = false;
     char *machine;
     if (gpio_get_level(RESET) == HIGH)
     {
         log_msg("Amiga detected...\n");
-        //is_amiga = true;
+        is_amiga = true;
         machine = (char *)"Amiga";
+        attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
+        //attachInterrupt(digitalPinToInterrupt(RESET), isr_wrapper_reset, FALLING); // doesn't work on Amiga, so not used
     }
     else
     {
         log_msg("C64 detected...\n");
         machine = (char *)"C64";
+        attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
         lcd->orientation(2); // upside down for C64
     }
-    char c = 0;
-    read(&c, 1, false); // try to read one char to make sure C64 is there
     lcd->printf("%s detected...\n", machine);
+
+    attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
+
+    setup_rcv();
+
 }
 #endif
 
