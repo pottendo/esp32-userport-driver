@@ -170,15 +170,15 @@ void pp_drv::pc2_isr_c64(void)
         // log_msg_isr(true, "pc2 isr - output1 - %d\n", higherPriorityTaskWoken);
         char c;
         unsigned long to = micros();
-        while (gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
+        while (0 && gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
         {
             if ((micros() - to) > 500)
             {
-                log_msg_isr(true, "/STROBE not deasserted for >500us.\n");
+                log_msg_isr(true, "/PC2 not deasserted for >500us.\n");
                 break;
             }
             blink(0, 0);
-            //ot deasserted waiting.\n");
+            log_msg_isr(true, "/PC2 not deasserted...\n");
         }
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
@@ -187,31 +187,19 @@ void pp_drv::pc2_isr_c64(void)
                 //log_msg_isr(true, "would send from ISR '%c'\n", c);
                 if (outchar(c, true))
                 {
-                    //udelay(40);
                     csent++;
-                    if ((csent % 500) == 0)
-                        blink(0, 0);
+                    //udelay(40);
                     flag_handshake();
-#if 0                    
-                    to = micros();
-                    while ((digitalRead(PA2) != LOW) && ((micros() - to) < 2500))
-                        ;
-                    if ((micros() - to) > 2000) // was 500, 1850 seen once.
-                    {
-                        log_msg_isr(true, "PC2 ISR write handshake1 (PA==LOW)- C64 not responding for %dus (-2).\n", micros() - to);
-                        err = -2;
-                    }
-#endif                    
                 }
                 else
                 {
-                    log_msg_isr(true, "PC2 ISR write error (-1).\n");
-                    err = -1;
+                    err = -EBUSY;
+                    log_msg_isr(true, "PC2 ISR write error EBUSY (%d).\n", err);
                 }
-#if 0             
+#if 0
                 unsigned long to = micros();
                 while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 2500))
-                    ;
+                    blink(0, 0);
                 if ((micros() - to) > 2000) // was 500, 1850 seen once.
                 {
                     log_msg_isr(true, "PC2 ISR write handshake1 (PA==HIGH)- C64 not responding for %dus (-2).\n", micros() - to);
@@ -229,55 +217,30 @@ void pp_drv::pc2_isr_c64(void)
             }
             else
             {
-                err = -100;
-                log_msg_isr(true, "PC2 ISR xQueueReceive failed (%d).\n", err);
+                err = -EIO;
+                log_msg_isr(true, "PC2 ISR xQueueReceive failed, EIO (%d).\n", err);
             }
         }
         else
         {
-            // log_msg_isr(true, "last char sent, releasing mutex\n");
-            if (err < 0)
-                log_msg_isr(true, "PC2 ISR write error, sent so far: %d bytes (%d). SHALL NEVER HAPPEN!!!", csent, err);
-
             // even sending 0 is OK, to enable retry
             if (xQueueSendToBackFromISR(s1_queue, &csent, &higherPriorityTaskWoken) == errQUEUE_FULL)
             {
-                err = -101;
-                log_msg_isr(true, "PC2 ISR can't release write (%d).\n", err);
+                err = -EIO;
+                log_msg_isr(true, "PC2 ISR can't release write, EIO (%d).\n", err);
             }
             csent = 0;
         }
-#if 0 
-        // removce me       
-        if (0 && err >= 0)
+        if (err < 0)
         {
-            unsigned long to = micros();
-            while (digitalRead(PA2) != LOW)
-            {
-                if ((micros() - to) > 2250) // saw delays up to 1860us
-                {
-                    while (digitalRead(PA2) != LOW)
-                        ;
-                    err = -3;
-                    log_msg_isr(true, "PC2 ISR write handshake2 (PA2==LOW) - C64 not responding for %dus(%d).\n", micros() - to, err);
-                    break;
-                }
-            }
-            // log_msg_isr(true, "pc2 ISR handshake 2 took %dus\n", micros() - to);
-        }
-#endif
-        if ((err < 0) && uxQueueMessagesWaitingFromISR(tx_queue))
-        {
-            log_msg_isr(true, "discarding: \"");
             // in case of error empty queue
             while (uxQueueMessagesWaitingFromISR(tx_queue))
             {
                 xQueueReceiveFromISR(tx_queue,
                                      (void *)&c,
                                      &higherPriorityTaskWoken);
-                log_msg_isr(true, "%c(%02x), ", (isprint(c) ? c : '~'), c);
             }
-            log_msg_isr(true, "\"\nISR emptied queue because of error %d.\n", err);
+            log_msg_isr(true, "ISR emptied queue because of error %d.\n", err);
             // even sending 0 is OK, to enable retry
             if (xQueueSendToBackFromISR(s1_queue, &csent, &higherPriorityTaskWoken) == errQUEUE_FULL)
             {
@@ -747,8 +710,10 @@ void pp_drv::open(void)
     {
         log_msg("C64 detected...\n");
         machine = (char *)"C64";
-        char c = 0;
+        lcd->orientation(2); // upside down for C64
     }
+    char c = 0;
+    read(&c, 1, false); // try to read one char to make sure C64 is there
     lcd->printf("%s detected...\n", machine);
 }
 #endif

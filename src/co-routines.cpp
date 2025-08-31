@@ -7,6 +7,7 @@
 
 std::list<cr_base *> cr_base::coroutines;
 char cr_base::aux_buf[MAX_AUX];
+char cr_base::aux_buf2[MAX_AUX];
 
 void setup_cr(void)
 {
@@ -54,7 +55,7 @@ bool cr_mandel_t::setup()
     return true;
 }
 
-static void hexdump(const char *buf, int len)
+void hexdump(const char *buf, int len)
 {
     int i;
     int idx = 0;
@@ -90,12 +91,13 @@ static void hexdump(const char *buf, int len)
         }
         strcat(linestr, "|");
         log_msg("%s\n", linestr);
+        linestr[0] = '\0';
         idx += 16;
         len -= 16;
     }
 }
 
-bool cr_mandel_t::run(pp_drv *drv)
+int cr_mandel_t::run(pp_drv *drv)
 {
     int ret;
     log_msg("Coroutine mandel\n");
@@ -123,7 +125,7 @@ bool cr_mandel_t::run(pp_drv *drv)
     if (ret != 1)
     {
         log_msg("coroutine plot, write error at exit: %d\n", ret);
-        return false;
+        return ret;
     }
 #else
     if ((ret = drv->write((const char *)canvas, CSIZE)) != CSIZE)
@@ -205,7 +207,7 @@ void cr_mandel_t::canvas_dump(canvas_t *c)
 
 // arithmetic functions
 
-bool cr_arith_t::run(pp_drv *drv)
+int cr_arith_t::run(pp_drv *drv)
 {
     char retbuf[6];
     int arg_len;
@@ -214,13 +216,13 @@ bool cr_arith_t::run(pp_drv *drv)
     if (ret != 1) // minimum 1 byte for arith-function code
     {
         log_msg("coroutine arith, read error %d\n", ret);
-        return false;
+        return ret;
     }
     if (aux_buf[0] & 0x08)
     {
         log_msg("MFLPT args not yet implemented.\n");
         arg_len = 5;
-        return false;
+        return -ENOSYS;
     }
     else
         arg_len = 6;
@@ -230,9 +232,9 @@ bool cr_arith_t::run(pp_drv *drv)
     if (ret != arg_bytes) // minimum 1 byte for arith-function code
     {
         log_msg("coroutine arith, read error %d\n", ret);
-        return false;
+        return ret;
     }
-
+    //log_msg("coroutine arith, fn=%02x, argslen=%d\n", aux_buf[0], arg_bytes);
     switch (aux_buf[0])
     {
     case uCFSIN:
@@ -278,9 +280,14 @@ bool cr_arith_t::run(pp_drv *drv)
         log_msg("arthmetic fn '%x' not implemented.\n");
         break;
     }
+    //log_msg("arith, result: ");
+    //hexdump(retbuf, 6);
     ret = drv->write(retbuf, 6);
     if (ret != 6)
+    {
         log_msg("coroutine arith, write error %d\n", ret);
+        return ret;
+    }
     return true;
 }
 
@@ -363,14 +370,14 @@ void cr_arith_t::parse_arg(const char *s)
 }
 #endif
 
-bool cr_plot_t::run(pp_drv *drv)
+int cr_plot_t::run(pp_drv *drv)
 {
-    bool r = true;
+    int r = true;
     int ret = drv->read(aux_buf, 1);
     if (ret != 1)
     {
         log_msg("coroutine plot, read error: %d\n", ret);
-        return false;
+        return ret;
     }
     log_msg("Coroutine plot: %d\n", aux_buf[0]);
     switch (aux_buf[0])
@@ -389,7 +396,7 @@ bool cr_plot_t::run(pp_drv *drv)
                 if (ret != 4)
                 {
                     log_msg("coroutine plot, write error: %d\n", ret);
-                    r = false;
+                    r = ret;
                 }
             }
         }
@@ -411,7 +418,7 @@ bool cr_plot_t::run(pp_drv *drv)
     if (ret != 4)
     {
         log_msg("coroutine plot, write error at exit: %d\n", ret);
-        return false;
+        return ret;
     }
 out:
     return r;

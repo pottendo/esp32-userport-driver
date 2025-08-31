@@ -52,7 +52,10 @@ public:
         display.clearDisplay();
         display.display();
     }
-
+    void orientation(int o) {
+        display.setRotation(o);
+        redraw();
+    }
 private:
     Adafruit_SSD1306 &display;
     uint16_t fgColor, bgColor;

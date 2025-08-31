@@ -70,9 +70,8 @@ int process_cmd(char *cmd)
     {
         for (auto cr : cr_base::coroutines)
         {
-            if (cr->match(cmd_buf, &drv))
+            if ((ret = cr->match(cmd_buf, &drv)) != 0)
             {
-                ret = 1;
                 goto out;
             }
         }
@@ -81,7 +80,7 @@ int process_cmd(char *cmd)
         if (ret != 1)
         {
             log_msg("process_cmd, read error: %d\n", ret);
-            break;
+            return ret;
         }
         cmd_buf[4] = '\0'; // probably not needed.
     }

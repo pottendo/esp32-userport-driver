@@ -29,6 +29,7 @@ void setup_cr(void);
 void loop_cr(void);
 
 int cmp(uint8_t *buf, int len);
+void hexdump(const char *buf, int len);
 
 class cr_base
 {
@@ -54,8 +55,9 @@ public:
 
     static std::list<cr_base *> coroutines;
     static char aux_buf[MAX_AUX];
+    static char aux_buf2[MAX_AUX];
 
-    bool match(char *cmd, pp_drv *drv)
+    int match(char *cmd, pp_drv *drv)
     {
         // log_msg("cmd %s vs. %s\n", cmd, name);
         if (strncmp(cmd, name.c_str(), 4) == 0)
@@ -65,20 +67,20 @@ public:
                 lcd->printf("CoRoutine %s\n", name.c_str());
             return timed_run(drv);
         }
-        return false;
+        return 0;
     };
 
-    bool timed_run(pp_drv *drv)
+    int timed_run(pp_drv *drv)
     {
         unsigned long t1;
-        bool ret;
+        int ret;
         t1 = millis();
         ret = run(drv);
         //log_msg("CoRoutine %s ran %dms\n", name.c_str(), millis() - t1);
         return ret;
     }
     virtual bool setup(void) = 0;
-    virtual bool run(pp_drv *drv) = 0;
+    virtual int run(pp_drv *drv) = 0;
     // virtual void loop(void) = 0;
 };
 
@@ -103,7 +105,7 @@ public:
     ~cr_mandel_t() { vSemaphoreDelete(pixmutex); }
 
     bool setup(void) override;
-    bool run(pp_drv *drv) override;
+    int run(pp_drv *drv) override;
     // void loop(void) override;
     void canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c);
 };
@@ -117,7 +119,7 @@ public:
     ~cr_echo_t() = default;
 
     bool setup(void) override { return true; };
-    bool run(pp_drv *drv) override
+    int run(pp_drv *drv) override
     {
         char c;
         int idx = 0, j;
@@ -132,7 +134,7 @@ public:
         if (ret != 1)
         {
             log_msg("read error: %d\n", ret);
-            return false;
+            return ret;
         }
         idx--;
         static char flip_buf[128];
@@ -158,13 +160,13 @@ public:
     ~cr_dump_t() = default;
 
     bool setup(void) override { return true; };
-    bool run(pp_drv *drv) override
+    int run(pp_drv *drv) override
     {
         int ret;
         if ((ret = drv->read(aux_buf, 2)) != 2)
         {
             log_msg("read error: %d\n", ret);
-            return false;
+            return ret;
         }
         int b = aux_buf[0] + aux_buf[1] * 256;
 
@@ -172,7 +174,7 @@ public:
         if (b >= MAX_AUX)
         {
             log_msg("dump too large: %d.\n", b);
-            return false;
+            return -E2BIG;
         }
         static int ch = 0;
         for (int i = 0; i < b; i++)
@@ -185,7 +187,7 @@ public:
         if ((ret = drv->write(aux_buf, b)) != b)
         {
             log_msg("write error: %d\n", ret);
-            return false;
+            return ret;
         }
         t2 = millis();
         float baud;
@@ -207,27 +209,27 @@ public:
     ~cr_dump2_t() = default;
 
     bool setup(void) override { return true; };
-    bool run(pp_drv *drv) override
+    int run(pp_drv *drv) override
     {
         char *buf = new char[MAX_AUX];
         int ret;
         if ((ret = drv->read(aux_buf, 2)) != 2)
         {
             log_msg("read error: %d\n", ret);
-            return false;
+            return ret;
         }
         int b = aux_buf[0] + aux_buf[1] * 256;
 
         if (b >= MAX_AUX)
         {
             log_msg("dump too large: %d.\n", b);
-            return false;
+            return -E2BIG;
         }
         unsigned long t1 = millis(), t2;
         if ((ret = drv->read(buf, b)) != b)
         {
             log_msg("read error: %d\n", ret);
-            return false;
+            return ret;
         }
         t2 = millis();
         float baud = ((float)ret) / (t2 - t1) * 8000;
@@ -246,7 +248,7 @@ public:
     ~cr_dump3_t() = default;
 
     bool setup(void) override { return true; };
-    bool run(pp_drv *drv) override
+    int run(pp_drv *drv) override
     {
         int lb = 0;
         int ret;
@@ -262,7 +264,7 @@ public:
             if (ret < 0)
             {
                 log_msg("%s: read error %d\n", __FUNCTION__, ret);
-                return false;
+                return ret;
             }
 #if 1            
             for (int i = 0; i < 8; i++)
@@ -299,7 +301,7 @@ public:
     ~cr_dump4_t() = default;
 
     bool setup(void) override { return true; };
-    bool run(pp_drv *drv) override
+    int run(pp_drv *drv) override
     {
         int ret, lb = 0;
         int end = 16;
@@ -313,7 +315,7 @@ public:
             if (ret != chunk_size)
             {
                 log_msg("%s: write error: %d\n", __FUNCTION__, ret);
-                return false;
+                return ret;
             }
             if (lb == 64000 / chunk_size)
             {
@@ -341,13 +343,13 @@ public:
     ~cr_read_t() = default;
 
     bool setup(void) override { return true; };
-    bool run(pp_drv *drv) override
+    int run(pp_drv *drv) override
     {
         int ret;
         if ((ret = drv->read(aux_buf, 2)) != 2)
         {
             log_msg("read error: %d\n", ret);
-            return false;
+            return ret;
         }
         int b = aux_buf[0] + aux_buf[1] * 256;
 
@@ -355,23 +357,35 @@ public:
         if (b >= MAX_AUX)
         {
             log_msg("read too large: %d.\n", b);
-            return false;
+            return -E2BIG;
         }
         long sent = 0;
-        while (sent < b)
+        log_msg("READ: Requesed to write %d bytes...\n", b);
+        // generate data
+        for (int i = 0; i < b; i++)
+            aux_buf[i] = charset_p_topetcii('a' + (i % 27));
+        if ((ret = drv->write(aux_buf, b)) != b)
         {
-            if (Serial.available())
-            {
-                char c = Serial.read();
-                char cpet = charset_p_topetcii(c);
-                if ((ret = drv->write(&cpet, 1)) != 1)
-                {
-                    log_msg("write error: %d\n", ret);
-                    return false;
-                }
-                sent++;
-            }
+            log_msg("READ: write error: %d\n", ret);
+            return ret;
         }
+        log_msg("READ: sent\n");
+        hexdump(aux_buf, 64);
+        // now read back
+        if ((ret = drv->read(aux_buf2, b)) != b)
+        {
+            log_msg("READ: readback error: %d\n", ret);
+            return ret;
+        }
+        log_msg("READ: received\n");
+        hexdump(aux_buf2, 64);
+        if (memcmp(aux_buf, aux_buf2, b) != 0)
+        {
+            log_msg("READ: readback data mismatch.\n");
+            return -EBADMSG;
+        }
+        else
+            log_msg("READ: readback data OK.\n");
         return true;
     }
 };
@@ -384,7 +398,7 @@ public:
     ~cr_irc_t() = default;
 
     bool setup(void) override { return true; }
-    bool run(pp_drv *drv) override
+    int run(pp_drv *drv) override
     {
         irc_t irc;
         while (irc.loop(*drv))
@@ -440,7 +454,7 @@ public:
     cr_arith_t(const char *n) : cr_base(String{n}) { reg(); }
     ~cr_arith_t() = default;
     bool setup(void) override { return true; }
-    bool run(pp_drv *drv) override;
+    int run(pp_drv *drv) override;
 };
 
 class cr_plot_t : public cr_base
@@ -449,6 +463,6 @@ public:
     cr_plot_t(const char *n) : cr_base(String{n}) { reg(); }
     ~cr_plot_t() = default;
     bool setup(void) override { return true; }
-    bool run(pp_drv *drv) override;
+    int run(pp_drv *drv) override;
 };
 #endif
