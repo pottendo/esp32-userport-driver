@@ -252,13 +252,16 @@ void change_mode(uCmode_t mode)
         drv.open();
         log_msg("ZiModem init start\n");
         web_send_cmd("ZiModem#Initializing...");
+        lcd->printf("ZiModem init...");
         ziinit_modem();
         log_msg("ZiModem init complete.\n");
+        lcd->printf("ready\n");
         web_send_cmd("ZiModem#online");
         break;
     case uCCoRoutine:
         web_send_cmd("CoRoutine#idle");
-        log_msg("waiting for C64 CoRoutine request...\n");
+        log_msg("CoRoutine mode\n");
+        lcd->printf("CoRoutine mode\n");
         break;
     default:
         // nothing to do

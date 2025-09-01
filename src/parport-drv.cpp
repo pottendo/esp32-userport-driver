@@ -25,14 +25,7 @@
 #include "ssd1306-display.h"
 
 //#define DUMP_TRAFFIC
-#ifdef AMIGA
-#define WRIND SELECT
-#define WRITING LOW
 #define flag_handshake ack_handshake
-#else
-#define WRIND SP2
-#define WRITING LOW
-#endif
 
 inline void udelay(unsigned long us)
 {
@@ -43,10 +36,6 @@ inline void udelay(unsigned long us)
  * static members
  */
 pp_drv *pp_drv::active_drv = nullptr;
-void IRAM_ATTR pp_drv::isr_wrapper_sp2(void)
-{
-    active_drv->sp2_isr();
-}
 
 void IRAM_ATTR pp_drv::isr_wrapper_pc2(void)
 {
@@ -58,9 +47,9 @@ void IRAM_ATTR pp_drv::isr_wrapper_strobe(void)
     active_drv->strobe_isr_amiga();
 }
 
-void IRAM_ATTR pp_drv::isr_wrapper_select(void)
+void IRAM_ATTR pp_drv::isr_wrapper_write_ind(void)
 {
-    active_drv->select_isr();
+    active_drv->write_ind_isr();
 }
 
 void IRAM_ATTR pp_drv::isr_wrapper_reset(void)
@@ -81,41 +70,20 @@ void pp_drv::th_wrapper2(void *t)
 }
 
 /* ISRs */
-void pp_drv::sp2_isr(void)
+void pp_drv::write_ind_isr(void)
 {
-    // SP2 signaled by C64:
-    //   LOW: C64 -> ESP
-    //   HIGH: ESP -> C64 possible
-    if (digitalRead(WRIND) == WRITING)
-    {
-        //log_msg_isr(true, "SP2(LOW) isr - mode C64->ESP\n");
-        setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
-    }
-    else
-    {
-        //log_msg_isr(true, "SP2(HIGH) isr - mode ESP->C64\n");
-        if (in_write)   // race management for read/write conflict
-        {
-            //log_msg_isr(true, "read/write race: SP2(HIGH) isr - mode ESP->C64\n");
-            setup_snd();
-            digitalWrite(2, ~digitalRead(2));
-        }
-    }
-}
-
-void pp_drv::select_isr(void)
-{
+    int stat;
     // select signaled by Amiga:
-    //   HIGH: Amiga writes
-    //   LOW: Amiga idle or read
-    if (digitalRead(SELECT) == HIGH)
+    //   HIGH: Amiga writes, C64 idle or reads
+    //   LOW: Amiga idle or read, C64 writes
+    if ((stat = digitalRead(WRIND)) == writing)
     {
-        //log_msg_isr(true, "SELECT(HIGH) isr - mode CBM->ESP\n");
+        //log_msg_isr(true, "WRIND(%d) isr - mode ESP -> CBM\n", stat);
         setup_rcv(); // make sure I/Os are setup to input to avoid conflicts on lines
     }
     else
     {
-        //log_msg_isr(true, "SELECT(LOW) isr - mode ESP->CBM\n");
+        //log_msg_isr(true, "WRIND(%d) isr - mode CBM -> ESP\n", stat);
         if (in_write)   // race management for read/write conflict
         {
             //log_msg_isr(true, "read/write race: SELECT(LOW) isr - mode ESP->host\n");
@@ -570,57 +538,6 @@ void pp_drv::drv_ackrcv(void)
     }
 }
 
-#ifdef NOT_OPTIMIZEIO
-void pp_drv::setup_snd(void)
-{
-    //log_msg("C64 Terminal - sender");
-    for (uint8_t i = _PB0; i <= _PB7; i++)
-    {
-        pinMode(PAR(i), OUTPUT);
-        digitalWrite(PAR(i), LOW);
-    }
-    mode = OUTPUT;
-}
-
-// called from ISR context!
-void pp_drv::setup_rcv(void)
-{
-    for (uint8_t i = _PB0; i <= _PB7; i++)
-    {
-        pinMode(PAR(i), INPUT);
-    }
-    mode = INPUT;
-}
-
-void pp_drv::open(void)
-{
-    pinMode(PA2, INPUT);
-    pinMode(PC2, INPUT_PULLUP);
-    pinMode(SP2, INPUT);
-    pinMode(SELECT, INPUT);
-    pinMode(FLAG, OUTPUT);
-    pinMode(2, OUTPUT);
-    digitalWrite(FLAG, HIGH);
-    mode = INPUT;
-    in_write = false;
-    csent = 0;
-    to = DEFAULT_WTIMEOUT;
-    xTaskCreate(th_wrapper1, "pp-drv-rcv", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th1);
-    xTaskCreate(th_wrapper2, "pp-drv-snd", 4000, this, uxTaskPriorityGet(nullptr) + 1, &th2);
-    delay(50); // give logger time to setup everything before first interrupts happen
-    attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
-
-    //pinMode(OE, OUTPUT);
-    //digitalWrite(OE, HIGH);
-
-    pinMode(BUSY, OUTPUT);
-    digitalWrite(BUSY, LOW);
-
-    setup_rcv();
-}
-#else
 #include "driver/gpio.h"
 
 void pp_drv::setup_snd(void)
@@ -673,7 +590,8 @@ void pp_drv::open(void)
     gpio_set_direction(PA2, GPIO_MODE_INPUT);
     gpio_set_direction(PC2, GPIO_MODE_INPUT);
     gpio_set_pull_mode(PC2, GPIO_PULLUP_ONLY);
-    gpio_set_direction(SP2, GPIO_MODE_INPUT);
+    gpio_set_direction(POUT, GPIO_MODE_INPUT);
+    // gpio_set_direction(SP2, GPIO_MODE_INPUT);    /* redundant as POUT == SP2 */
     gpio_set_direction(SELECT, GPIO_MODE_INPUT);
     gpio_set_direction(RESET, GPIO_MODE_INPUT);
     gpio_set_pull_mode(RESET, GPIO_PULLDOWN_ONLY);
@@ -681,7 +599,7 @@ void pp_drv::open(void)
     gpio_set_direction(FLAG, GPIO_MODE_OUTPUT);
     gpio_set_direction(static_cast<gpio_num_t>(2), GPIO_MODE_OUTPUT);
     gpio_set_direction(BUSY, GPIO_MODE_OUTPUT);
-    //gpio_set_direction(POUT, GPIO_MODE_OUTPUT);
+
     gpio_set_level(FLAG, 1);
     gpio_set_level(BUSY, 0);
     //gpio_set_level(POUT, 0);
@@ -699,34 +617,30 @@ void pp_drv::open(void)
     {
         log_msg("Amiga detected...\n");
         is_amiga = true;
+        writing = HIGH;
         machine = (char *)"Amiga";
-        attachInterrupt(digitalPinToInterrupt(SELECT), isr_wrapper_select, CHANGE);
         attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_strobe, FALLING);
-        //attachInterrupt(digitalPinToInterrupt(RESET), isr_wrapper_reset, FALLING); // doesn't work on Amiga, so not used
+        attachInterrupt(digitalPinToInterrupt(RESET), isr_wrapper_reset, FALLING); // doesn't work on Amiga, so not used
     }
     else
     {
         log_msg("C64 detected...\n");
+        writing = LOW;
         machine = (char *)"C64";
-        attachInterrupt(digitalPinToInterrupt(SP2), isr_wrapper_sp2, CHANGE);
         attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
         lcd->orientation(2); // upside down for C64
     }
     lcd->printf("%s detected...\n", machine);
-
-    
+    attachInterrupt(digitalPinToInterrupt(WRIND), isr_wrapper_write_ind, CHANGE);
     setup_rcv();
-
 }
-#endif
-
 
 void pp_drv::close(void)
 {
     in_write = false;
     to = DEFAULT_WTIMEOUT;
     csent = 0;
-    detachInterrupt(digitalPinToInterrupt(SP2));
+    detachInterrupt(digitalPinToInterrupt(WRIND));
     detachInterrupt(digitalPinToInterrupt(PC2));
     vTaskDelete(th1);
     vTaskDelete(th2);
@@ -759,76 +673,6 @@ ssize_t pp_drv::read(void *buf_, size_t len, bool block)
     return count;
 }
 
-#if 0
-// also called from ISR context!
-bool pp_drv::outchar(const char ct, bool from_isr)
-{
-    unsigned long t, t1;
-    bool ret = true;
-    //log_msg("%s: %c - ", __FUNCTION__, ct);
-    t = micros();
-    while (((digitalRead(SP2) == LOW) ||
-            (digitalRead(PA2) == HIGH)) && 
-            ((micros() - t) < 1000 * 5)) // allow 5ms to pass
-        ;
-    if ((t1 = (micros() - t)) > 100)
-        log_msg_isr(from_isr, "outchar: C64 busy for %dus\n", t1);
-    for (uint8_t s = _PB0; s <= _PB7; s++)
-    {
-        if ((digitalRead(SP2) == HIGH) && (digitalRead(PA2) == LOW))
-        {
-            uint8_t bit = (ct & (1 << s)) ? HIGH : LOW;
-            //log_msg("%c", (bit ? '1' : '0'));
-            digitalWrite(PAR(s), bit);
-        }
-        else
-        {
-            log_msg_isr(from_isr, "C64 SP2=%d (0 == C64 writing), PA2=%d (1 == C64 busy) - cowardly refusing to write.\n",
-                        digitalRead(SP2), digitalRead(PA2)); 
-            ret = false;
-            goto out;
-
-        }
-    }
-    // log_msg("\n");
-    flag_handshake();
-out:
-    return ret;
-}
-
-#else
-#ifdef NOT_OPTIMIZEIO
-// also called from ISR context!
-bool pp_drv::outchar(const char ct, bool from_isr)
-{
-    unsigned long t, t1;
-    bool ret = true;
-    //log_msg("%s: %c - ", __FUNCTION__, ct);
-    for (uint8_t s = _PB0; s <= _PB7; s++)
-    {
-        t = micros();
-        while ((digitalRead(WRIND) == WRITING) && ((micros() - t) < 1000 * 100)) // allow 100ms to pass
-            ;
-        if ((t1 = (micros() - t)) > 1000)
-            log_msg_isr(from_isr, "outchar: host busy for %dus\n", t1);
-        if (digitalRead(WRIND) != WRITING)
-        {
-            uint8_t bit = (ct & (1 << s)) ? HIGH : LOW;
-            //log_msg("%c", (bit ? '1' : '0'));
-            digitalWrite(PAR(s), bit);
-        }
-        else
-        {
-            log_msg_isr(from_isr, "host ist writing - cowardly refusing to write.\n"); // may fail as ISR printfs ar no-good...
-            ret = false;
-            break;
-        }
-    }
-    //log_msg("\n");
-    return ret;
-}
-
-#else
 // also called from ISR context!
 bool pp_drv::outchar(const char ct, bool from_isr)
 {
@@ -837,11 +681,11 @@ bool pp_drv::outchar(const char ct, bool from_isr)
     for (uint8_t s = _PB0; s <= _PB7; s++)
     {
         t = micros();
-        while ((gpio_get_level(WRIND) == WRITING) && ((micros() - t) < 1000 * 100)) // allow 100ms to pass
+        while ((gpio_get_level(WRIND) == writing) && ((micros() - t) < 1000 * 100)) // allow 100ms to pass
             ;
         if ((t1 = (micros() - t)) > 1000)
             log_msg_isr(from_isr, "outchar: host busy for %dus\n", t1);
-        if (gpio_get_level(WRIND) != WRITING)
+        if (gpio_get_level(WRIND) != writing)
         {
             uint8_t bit = (ct & (1 << s)) ? 1 : 0;
             //log_msg("%c", (bit ? '1' : '0'));
@@ -857,8 +701,6 @@ bool pp_drv::outchar(const char ct, bool from_isr)
     //log_msg("\n");
     return ret;
 }
-#endif
-#endif
 
 size_t pp_drv::write(const void *buf, size_t len)
 {
@@ -911,16 +753,16 @@ size_t pp_drv::_write(const void *buf, size_t len)
 #endif
     bool was_busy = false;
     t1 = millis();
-    while (digitalRead(WRIND) == WRITING)
+    while (digitalRead(WRIND) == writing)
     {
         counter_SP2++;
         was_busy = true;
-        if ((millis() - t1) > 5000) // give up after 5s
+        if ((millis() - t1) > 10000) // give up after 10s
         {
             log_msg("waiting for host to read...\n");
             t1 = millis();
-            //ret = -1;
-            //goto out;
+            ret = -1;
+            goto out;
         }
     }
 #if 1

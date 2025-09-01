@@ -317,6 +317,7 @@ public:
                 log_msg("%s: write error: %d\n", __FUNCTION__, ret);
                 return ret;
             }
+            //log_msg("successfully wrote %d bytes.\n", ret);
             if (lb == 64000 / chunk_size)
             {
                 t2 = millis();
@@ -360,7 +361,7 @@ public:
             return -E2BIG;
         }
         long sent = 0;
-        log_msg("READ: Requesed to write %d bytes...\n", b);
+        log_msg("READ: Requested to write %d bytes...\n", b);
         // generate data
         for (int i = 0; i < b; i++)
             aux_buf[i] = charset_p_topetcii('a' + (i % 27));

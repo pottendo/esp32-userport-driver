@@ -145,9 +145,17 @@ int cmp(uint8_t *s, int len)
 
 void cr_mandel_t::canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c)
 {
-    uint h = x % (8 / PIXELW);
-    uint shift = (8 / PIXELW - 1) - h;
-    uint val = (c << (shift * PIXELW));
+    uint h, shift, val;
+    if (drv->is_amiga_drv())
+    {
+        val = c;
+    }
+    else
+    {
+        h = x % (8 / PIXELW);
+        shift = (8 / PIXELW - 1) - h;
+        val = (c << (shift * PIXELW));
+    }
 
 #ifdef MANDEL_LIVE_TRACK
     P(pixmutex);

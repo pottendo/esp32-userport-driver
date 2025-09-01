@@ -37,6 +37,7 @@ class pp_drv
     bool in_write = false;
     bool block_ack = false;
     bool is_amiga = false;
+    int writing = 0;    /* C64 lowers SP2 for write, Amiga raises POUT for write */
     // enum to enable iteration over all pins
     typedef enum
     {
@@ -50,12 +51,12 @@ class pp_drv
         _PB7,
         _PA2,
         _PC2,   // STROBE
-        _SP2,
+        _SP2,   // =POUT on Amiga, used to tell ESP->Amiga direction
         _FLAG,  // ACK
         _OE,
         _BUSY,
         _SELECT,
-        _POUT,  // POUT, used to tell ESP->Amiga direction
+        _POUT,  // =SP2 on C64, used to tell ESP->Amiga direction
         _RESET  // /RESET
     } par_pins_t;
 //    const uint8_t par_pins[14] = {13, 4, 16, 17, 5, 18, 19, 32 /*22*/, 23, 25 /*21*/, 27, 15, 26, 12};
@@ -64,8 +65,8 @@ class pp_drv
             static_cast<gpio_num_t>( 5), static_cast<gpio_num_t>(17), static_cast<gpio_num_t>(16), 
             static_cast<gpio_num_t>( 4), static_cast<gpio_num_t>(13), static_cast<gpio_num_t>(23), 
             static_cast<gpio_num_t>(25), static_cast<gpio_num_t>(14), static_cast<gpio_num_t>(15), 
-            static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(14),
-            static_cast<gpio_num_t>(27), static_cast<gpio_num_t>(33)};
+            static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(26), static_cast<gpio_num_t>(27),
+            static_cast<gpio_num_t>(14), static_cast<gpio_num_t>(33)};
     QueueHandle_t rx_queue;
     QueueHandle_t tx_queue;
     QueueHandle_t s1_queue;
@@ -76,7 +77,7 @@ class pp_drv
     ring_buf_t<unsigned char> ring_buf{rbuf_len};
     int32_t csent;
     uint32_t to;
-    const uint32_t DEFAULT_WTIMEOUT = (80 * portTICK_PERIOD_MS);
+    const uint32_t DEFAULT_WTIMEOUT = (100 * portTICK_PERIOD_MS);
 #define PAR(x) (par_pins[x])
 #define PB0 PAR(_PB0)
 #define PB1 PAR(_PB1)
@@ -95,19 +96,19 @@ class pp_drv
 #define SELECT PAR(_SELECT)
 #define POUT PAR(_POUT)
 #define RESET PAR(_RESET)
+#define WRIND POUT    // could be SP2 (C64 notion) also
 
+    char aux_buf[16]; // auxiliary buffer for coroutines
 protected:
     static void th_wrapper1(void *t);
     static void th_wrapper2(void *t);
-    static void isr_wrapper_sp2(void);
-    static void isr_wrapper_select(void);
+    static void isr_wrapper_write_ind(void);
     static void isr_wrapper_pc2(void);
     static void isr_wrapper_strobe(void);
     static void isr_wrapper_reset(void);
     static pp_drv *active_drv;
 
-    void sp2_isr(void);
-    void select_isr(void);
+    void write_ind_isr(void);
     void reset_isr(void);
     void strobe_isr_amiga(void);
     void pc2_isr_c64(void);
@@ -134,7 +135,7 @@ public:
     void setup_snd(void);
     void open(void);
     void close(void);
-
+    inline bool is_amiga_drv(void) { return is_amiga; }
     int writestr(String &s) { return write(s.c_str(), s.length()); }
     size_t write(const void *s, size_t len);
     size_t write(uint8_t c) { return write((const char *)(&c), 1); }
