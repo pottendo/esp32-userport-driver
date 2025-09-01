@@ -27,6 +27,7 @@
 #include "wifi.h"
 #include "html.h"
 #include "misc.h"
+#include "ssd1306-display.h"
 
 #ifdef MQTT
 #include "mqtt.h"
@@ -82,6 +83,8 @@ static void wifi_task(void *p)
 void setup_wifi(void)
 {
     log_msg("Setting up Wifi...\n");
+    //WiFi.begin("pottendo", "XXX");
+#if 1
     config.ota = AC_OTA_BUILTIN;
     config.hostName = hostname;
     config.beginTimeout = 25000; /* try 25s to connect */
@@ -96,11 +99,12 @@ void setup_wifi(void)
     }
     // Prepare dynamic web page
     setup_websocket();
+#endif    
     log_msg(String(hostname) + ", " +
             WiFi.localIP().toString() + ", GW = " +
             WiFi.gatewayIP().toString() + ", DNS = " +
             WiFi.dnsIP().toString() + '\n');
-    // init and get the time
+    lcd->printf("IP: %s\n", WiFi.localIP().toString().c_str());
     log_msg("Setting up local time...\n");
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
     printLocalTime();

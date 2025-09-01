@@ -39,7 +39,7 @@ static bool mqtton = false;
 
 const char esp32coC64_main[] PROGMEM = R"raw(
 {
-  "title" : "<b>ESP32 Coprocessor for C64</b> - Control Page",
+  "title" : "<b>ESP32 Coprocessor for Commodore Machines</b> - Control Page",
   "uri" : "/",
   "menu" : false,
   "element" : [
