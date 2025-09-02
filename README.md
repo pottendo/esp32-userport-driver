@@ -1,5 +1,5 @@
-# esp32-userport-driver
-- [esp32-userport-driver](#esp32-userport-driver)
+# esp32-userport/parport-driver
+- [esp32-userport/parport-driver](#esp32-userportparport-driver)
   - [Introduction](#introduction)
   - [Credits](#credits)
   - [Build](#build)
@@ -17,9 +17,11 @@
     - [Bugs / Missing Features](#bugs--missing-features)
   - [License](#license)
 ## Introduction
-This project is closely connected to its counterpart, the *C64 Userport Driver* (https://github.com/pottendo/c64-userport-driver).
+This project is closely connected to its counterparts:
+- the *C64 Userport Driver* (https://github.com/pottendo/c64-userport-driver)
+- the *Amiga Parallelport Driver* (https://github.com/pottendo/amiga-play)
 
-It enables an ESP32 based uController to act a C64 userport modem, a general purpose co-processor or a generic interface to wireless connectivity (e.g. via MQTT or IRC protocolls).
+It enables an ESP32 based uController to act a userport (C64) or parallelport (Amiga) modem, a general purpose co-processor or a generic interface to wireless connectivity (e.g. via MQTT or IRC protocolls).
 
 ## Credits
 This project is heavily based on **Bo Zimmerman's ZiModem** implementation (https://github.com/bozimmerman/Zimodem)
