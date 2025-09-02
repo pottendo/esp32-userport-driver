@@ -25,7 +25,6 @@
 #include "ssd1306-display.h"
 
 //#define DUMP_TRAFFIC
-#define flag_handshake ack_handshake
 
 inline void udelay(unsigned long us)
 {
@@ -629,6 +628,7 @@ void pp_drv::open(void)
         machine = (char *)"C64";
         attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
         lcd->orientation(2); // upside down for C64
+        flag_handshake(); // make sure FLAG is HIGH
     }
     lcd->printf("%s detected...\n", machine);
     attachInterrupt(digitalPinToInterrupt(WRIND), isr_wrapper_write_ind, CHANGE);

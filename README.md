@@ -6,6 +6,7 @@
   - [Hardware](#hardware)
     - [Connections](#connections)
     - [Parts used](#parts-used)
+  - [Software](#software)
   - [Functions](#functions)
     - [ZiModem](#zimodem)
     - [MQTT Client as 'AT' command](#mqtt-client-as-at-command)
@@ -41,60 +42,85 @@ WiFi configuration is bootstrapped using the great *AutoConnect* Arduino package
 
 **DISCLAIMER! <br>REBUILDING MAY DESTROY YOUR C64/ESP/other equipment! USE THIS INFORMATION AT YOUR OWN RISK** 
 
-The needed hardware can be easily built - even I managed to do it - Knowing the sensitivity of the I/O chips (CIAs) of a C64, specific care has been taken to protect the individual I/O lines (100 Ohm resistors). 
+The needed hardware can be easily built - even I managed to do it - Knowing the sensitivity of the I/O chips (CIAs) of a C64, specific care has been taken to protect the individual I/O lines (100 Ohm resistors).
 I was told by HW engineers, that using this approach, even when both side apply logical *HIGH* (5V on C64, 3.3V on ESP side) the conflict would not result into damaged CIA chips. 
 During development and experimentation the SW could easily be buggy to provoke such a scenario.
+
+Update - as of September 2025
+
+I've built another version of the HW, see pinout below. Resistors are gone, as I've made some SW precautions to avoid writing from both side. Also the used level-shifters have 10kOhm resistors, so I assume the HW is safe, even in the rare case of SW caused writes from both ends. Still, use at your own risk.
+
+The new HW features a parallel connector on the other side to be connected to Amiga machines - tested on a A500+. The SW for the ESP is compatible with both sides.
+I found out that my 8 channel level-shifters using a _TXS0108E_ don't work, as I saw unreliable signals, especially when talking to the Amiga. So I use simple 4 channel shifters.
 
 [ circuit diagram missing ]
 
 ### Connections 
 
 **ATTENTION - use with care, information may be wrong**
-| C64 Userport | Level Shifter | Level Shifter| ESP I/O | Comment |
-|--------------|------|-----|--|-|
-| GND (N)| LvSh A GND|||
-| 5V (2)| LvSh A VB|LvSh B VB||
-| FLAG (B)| LvSh A B8| LvSh A A8| GPIO 15|
-| PB0 (C)| LvSh A B7| LvSh A A7|GPIO 32|
-| PB1 (D)| LvSh A B6| LvSh A A6| GPIO 19|
-| PB2 (E)| LvSh A B5| LvSh A A5| GPIO 18|
-| PB3 (F)| LvSh A B4| LvSh A A4| GPIO 5|
-| PB4 (H)| LvSh A B3| LvSh A A3| GPIO 17|
-| PB5 (J)| LvSh A B2| LvSh A A2| GPIO 16|
-| PB6 (K)| LvSh A B1| LvSh A A1| GPIO 4|
-| GND (1)| | LvSh B GND | GND|
-| PB7 (L)| LvSh B B8| LvSh B A8| GPIO 13|
-| PA2 (M)| LvSh B B7| LvSh B A7| GPIO 23|
-| PC2 (8)| LvSh B B6| LvSh B A5| GPIO 25|
-| SP2 (7)| LvSh B B5| LvSh B A5| GPIO 27|
-| - | LvSh A OE |LvSh B OE| GPIO 26 | Output enable control|
-|-| LvSh A VA | LvSh B VA| 3V3
-| CNT2 (6)| LvSh B B4| LvSh B A4| -| not used|
-| SP1 (5)| LvSh B B3| LvSh B A3| -|not used|
-| CNT1 (4)| LvSh B B2| LvSh B A2| -|not used|
-| ATN (9)| LvSh B B1| LvSh B A1| -|not used|
-| RESET(3)| ||| connected to GND via button
+| C64 Userport (Pin)| Amiga Parallelport (Pin)| ESP I/O | Comment |
+|-------------------|-------------------------|---------|---------|
+| GND (1)| GND(25) | GND | connect also to all level shifter GND's, both on high- and low-voltage side|
+| 5V (2)| +5V PULLUP (14)| - | connect to level shifter high voltage side |
+| RESET (3)|-|-|connected to GND via button|
+| CNT1 (4)| BUSY (11)| GPIO 26 | C64 SW doesn't use this yet |
+| CNT2 (6)| -| - | not used yet|
+| SP1 (5)| SELECT (13) | GPIO 27 | not used yet|
+| SP2 (7)| POUT (12)| GPIO 14 | indicates write |
+| PC2 (8)| STROBE (1)| GPIO 25| Interrupt trigger |
+| GND (A)| -| GPIO (33) | This pulls down the GPIO indicating C64 mode - DO NOT CONNECT TO GND ON THE AMIGA/PARALELPORT SIDE!!! |
+| - | RESET(16) | GPIO (33) | This pulls up the GPIO indicating Amiga mode |
+| FLAG (B)| ACK (10)|GPIO 15| Acknowledge |
+| PB0 (C)| D0| GPIO 32| Data line |
+| PB1 (D)| D1| GPIO 19| Data line |
+| PB2 (E)| D2| GPIO 18| Data line |
+| PB3 (F)| D3| GPIO 5| Data line |
+| PB4 (H)| D4| GPIO 17| Data line |
+| PB5 (J)| D5| GPIO 16| Data line |
+| PB6 (K)| D6|GPIO 4| Data line |
+| PB7 (L)| D7|GPIO 13| Data line |
+| PA2 (M)| - |GPIO 23| specific flow control on C64|
+| - | - | 3V3 | connect to level shifter low voltage side |
+
+Note: the RESET line from the Amiga port is used to distinguish C64 from Amiga mode, as the SW needs to act slightly different.
+
+| LCD SSD1306 (Pin)| ESP I/O | Comment|
+|------------------|---------|--------|
+|GND|GND||
+|VCC|3V3||
+|SDA|GPIO 21||
+|SCL|GPIO 22||
+
 
 These can be adjusted in *parport-drv.h* to your uController preference.
 
 Power supply for the ESP is **not** provided from the C64 but needs to be provided by USB (ESP may use more than 100mA peak current). A later stage the project may provide some other PS concept.<br>
 
-Refer to https://photos.app.goo.gl/k1wo87s1YanoMtGB7 for some pictures.
+Refer to https://photos.app.goo.gl/k1wo87s1YanoMtGB7 for some pictures of version 1 HW
+
+Refer to https://photos.app.goo.gl/Bz6kksDdvZpG9Ar46 for some pictures of version 2 HW
 
 ### Parts used
 |Part|Type|Comment|
 |---|---|---|
-|2 x AZDelivery TXS0108E| 5V <-> 3.3V Bidirectional 8 Channel Level Shifter |
-| 1 x AZDelivery ESP32 D1 Mini NodeMCU  | ESP32 uController |
-| 1 x Youmile 6x6x6 mm Miniatur-Mikro-Taster-Tastschalter  | Reset Button|
-| 16x 100Ohm Resistor | Protection|
-| Sockets||
-| 1 x Prototyping PCB 6x8cm
-| 1 x Userport Connector
+| 4x 4-Channel Bi Directional Level Shifter | 5V <-> 3.3V|
+| 1x AZDelivery ESP32 D1 Mini NodeMCU  | ESP32 uController |
+| 1x Youmile 6x6x6 mm Miniatur-Mikro-Taster-Tastschalter  | Reset Button|
+| 1x Prototyping PCB 6x8cm
+| 1x Userport Connector
+| 1x Parallelport Connector
+
+## Software
+
+|Target | Description|URL|
+|-------|------------|---|
+|ESP32| ESP driver and functions|https://github.com/pottendo/esp32-userport-driver|
+|C64| C64 driver and test SW|https://github.com/pottendo/c64-userport-driver|
+|Amiga| Amiga driver and test SW|https://github.com/pottendo/amiga-play|
 
 ## Functions
 The ESP firmware features
-- 8-Parallel *high-speed* communication to the C64
+- 8-Parallel *high-speed* communication to the C64/Amiga
 - ZiModem (default mode)
 - MQTT remote controllable
 - WebServer controllable

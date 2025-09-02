@@ -116,15 +116,11 @@ protected:
     bool outchar(const char c, bool from_isr);
     size_t _write(const void *s, size_t len);
     void drv_body();
-    inline void ack_handshake(void) /* Amiga uses /ACK */
+
+    inline void flag_handshake(void)    /* Amiga uses /ACK */
     {
         digitalWrite(FLAG, LOW);
         digitalWrite(FLAG, HIGH);
-    }
-    inline void flag_handshake(void)
-    {
-        digitalWrite(FLAG, HIGH);
-        digitalWrite(FLAG, LOW);
     }
     
 public:
