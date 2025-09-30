@@ -77,7 +77,7 @@ class pp_drv
     ring_buf_t<unsigned char> ring_buf{rbuf_len};
     int32_t csent;
     uint32_t to;
-    const uint32_t DEFAULT_WTIMEOUT = (100 * portTICK_PERIOD_MS);
+    const uint32_t DEFAULT_WTIMEOUT = (1000 * portTICK_PERIOD_MS);
 #define PAR(x) (par_pins[x])
 #define PB0 PAR(_PB0)
 #define PB1 PAR(_PB1)
@@ -106,10 +106,12 @@ protected:
     static void isr_wrapper_pc2(void);
     static void isr_wrapper_strobe(void);
     static void isr_wrapper_reset(void);
+    static void isr_wrapper_dummy(void);
     static pp_drv *active_drv;
 
     void write_ind_isr(void);
     void reset_isr(void);
+    void dummy_isr(void);
     void strobe_isr_amiga(void);
     void pc2_isr_c64(void);
     void drv_ackrcv(void);
@@ -120,6 +122,7 @@ protected:
     inline void flag_handshake(void)    /* Amiga uses /ACK */
     {
         digitalWrite(FLAG, LOW);
+        udelay(3);
         digitalWrite(FLAG, HIGH);
     }
     

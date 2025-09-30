@@ -179,9 +179,11 @@ public:
         static int ch = 0;
         for (int i = 0; i < b; i++)
         {
-            aux_buf[i] = charset_p_topetcii('a' + ((i + ch++) % 27));
+            aux_buf[i] = charset_p_topetcii('a' + ((i + ch) % 27));
         }
+        ch++;
         //delay(500);
+        hexdump(aux_buf, 32);
         unsigned long t1, t2;
         t1 = millis();
         if ((ret = drv->write(aux_buf, b)) != b)
@@ -235,6 +237,7 @@ public:
         float baud = ((float)ret) / (t2 - t1) * 8000;
         int equal = cmp((uint8_t *)buf, ret);
         log_msg("successfully read %d bytes in %ldms(%.0f BAUD) - %sidentical.\n", ret, millis() - t1, baud, ((equal == 0) ? "" : "not "));
+        hexdump(buf, 64);
         delete[] buf;
         return true;
     }
@@ -364,13 +367,25 @@ public:
         log_msg("READ: Requested to write %d bytes...\n", b);
         // generate data
         for (int i = 0; i < b; i++)
-            aux_buf[i] = charset_p_topetcii('a' + (i % 27));
+        {
+            aux_buf[i] = charset_p_topetcii('0' + (i % 10));
+#if 0            
+            if ((ret = drv->write(&aux_buf[i], 1)) != 1)
+            {
+                log_msg("READ: write error: %d\n", ret);
+                return ret;
+            }
+            //printf("READ: sent byte %d/%c\n", aux_buf[i], (isPrintable(aux_buf[i]) ? aux_buf[i] : '~'));
+            //delay(3000);
+#endif            
+        }
+#if 1           
         if ((ret = drv->write(aux_buf, b)) != b)
         {
             log_msg("READ: write error: %d\n", ret);
             return ret;
         }
-        log_msg("READ: sent\n");
+#endif
         hexdump(aux_buf, 64);
         // now read back
         if ((ret = drv->read(aux_buf2, b)) != b)
@@ -378,7 +393,6 @@ public:
             log_msg("READ: readback error: %d\n", ret);
             return ret;
         }
-        log_msg("READ: received\n");
         hexdump(aux_buf2, 64);
         if (memcmp(aux_buf, aux_buf2, b) != 0)
         {

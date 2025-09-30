@@ -56,6 +56,11 @@ void IRAM_ATTR pp_drv::isr_wrapper_reset(void)
     active_drv->reset_isr();
 }
 
+void IRAM_ATTR pp_drv::isr_wrapper_dummy(void)
+{
+    active_drv->dummy_isr();
+}
+
 void pp_drv::th_wrapper1(void *t)
 {
     pp_drv *drv = static_cast<pp_drv *>(t);
@@ -96,6 +101,14 @@ void pp_drv::reset_isr(void)
     log_msg_isr(true, "Amiga RESET\n");
 }
 
+void pp_drv::dummy_isr(void)
+{
+    if (digitalRead(PA2) == HIGH)
+        log_msg_isr(true, "dummy ISR - PA2 HIGH\n");
+    else
+        log_msg_isr(true, "dummy ISR - PA2 LOW\n");
+}
+
 void pp_drv::pc2_isr_c64(void)
 {
     int32_t err = 0;
@@ -134,37 +147,46 @@ void pp_drv::pc2_isr_c64(void)
     if (mode == OUTPUT)
     {   
         BaseType_t higherPriorityTaskWoken = pdFALSE;
-        // log_msg_isr(true, "pc2 isr - output1 - %d\n", higherPriorityTaskWoken);
+        //log_msg_isr(true, "pc2 isr - output\n");
         char c;
-#if 0        
+#if 1   
         unsigned long to = micros();
-        while (0 && gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
+        while (gpio_get_level(PC2) == 0) // wait until /PC2 is de-asserted
         {
             if ((micros() - to) > 500)
             {
                 log_msg_isr(true, "/PC2 not deasserted for >500us.\n");
+                blink(0, 0);
                 break;
             }
-            blink(0, 0);
-            log_msg_isr(true, "/PC2 not deasserted...\n");
         }
 #endif       
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
             if (xQueueReceiveFromISR(tx_queue, (void *)&c, &higherPriorityTaskWoken) == pdTRUE)
             {
-                //log_msg_isr(true, "would send from ISR '%c'\n", c);
-                if (outchar(c, true))
+                unsigned long to = micros();
+                while ((digitalRead(PA2) == HIGH) && ((micros() - to) < 2500000L))
+                    blink(0, 0);
+                if ((micros() - to) > 2000000L) // was 500, 1850 seen once.
                 {
-                    csent++;
-                    //udelay(40);
-                    flag_handshake();
+                    log_msg_isr(true, "PC2 ISR write handshake1 (PA==HIGH)- C64 not responding for %dus (-2).\n", micros() - to);
+                    err = -BUSY;
                 }
                 else
                 {
-                    err = -EBUSY;
-                    log_msg_isr(true, "PC2 ISR write error EBUSY (%d).\n", err);
-                }
+                    //log_msg_isr(true, "would send from ISR '%c'\n", c);
+                    if (outchar(c, true))
+                    {
+                        csent++;
+                        //udelay(40);
+                        flag_handshake();
+                    }
+                    else
+                    {
+                        err = -EBUSY;
+                        log_msg_isr(true, "PC2 ISR write error EBUSY (%d).\n", err);
+                    }
 #if 0
                 unsigned long to = micros();
                 while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 2500))
@@ -183,7 +205,8 @@ void pp_drv::pc2_isr_c64(void)
                     log_msg_isr(true, "PC2 ISR write handshake1 (PA==LOW)- C64 not responding for %dus (-2).\n", micros() - to);
                     err = -2;
                 }
-#endif                
+#endif
+                }
             }
             else
             {
@@ -588,9 +611,11 @@ void pp_drv::open(void)
 
     // Now set directions and pull modes for non-parallel pins
     gpio_set_direction(PA2, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(PA2, GPIO_PULLUP_ONLY);
     gpio_set_direction(PC2, GPIO_MODE_INPUT);
     gpio_set_pull_mode(PC2, GPIO_PULLUP_ONLY);
     gpio_set_direction(POUT, GPIO_MODE_INPUT);
+    //gpio_set_pull_mode(POUT, GPIO_PULLUP_ONLY);
     // gpio_set_direction(SP2, GPIO_MODE_INPUT);    /* redundant as POUT == SP2 */
     gpio_set_direction(SELECT, GPIO_MODE_INPUT);
     gpio_set_direction(RESET, GPIO_MODE_INPUT);
@@ -628,12 +653,64 @@ void pp_drv::open(void)
         writing = LOW;
         machine = (char *)"C64";
         attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
+        //attachInterrupt(digitalPinToInterrupt(PA2), isr_wrapper_dummy, CHANGE);
         lcd->orientation(2); // upside down for C64
-        flag_handshake(); // make sure FLAG is HIGH
+        //flag_handshake(); // make sure FLAG is HIGH
     }
     lcd->printf("%s detected...\n", machine);
     attachInterrupt(digitalPinToInterrupt(WRIND), isr_wrapper_write_ind, CHANGE);
     setup_rcv();
+#if 0
+    setup_snd();
+    log_msg("trigger now bit0/bit1\n");
+    int i = 0;
+    while(1)
+    {
+        unsigned long d, to = micros();
+        while (digitalRead(PA2) != LOW)
+        {
+            if ((d = (micros() - to)) > 1000000)
+            {
+                log_msg("input handshake (PA2==LOW) too long: %ld\n", d);
+                to = micros();
+            }
+        }
+        //log_msg("input handshake (PA2!=LOW): %ld\n", d);
+        gpio_set_level(PB0, 0);
+        gpio_set_level(PB1, 0);
+        gpio_set_level(PB2, 0);
+        gpio_set_level(PB3, 0);
+        gpio_set_level(PB4, 0);
+        gpio_set_level(PB5, 0);
+        gpio_set_level(PB6, 0);
+        gpio_set_level(PB7, 0);
+        flag_handshake();
+        delay(1000);
+        gpio_set_level(PB0, 1);
+        gpio_set_level(PB1, 1);
+        gpio_set_level(PB2, 1);
+        gpio_set_level(PB3, 1);
+        gpio_set_level(PB4, 1);
+        gpio_set_level(PB5, 1);
+        gpio_set_level(PB6, 1);
+        gpio_set_level(PB7, 1);
+        flag_handshake();
+        delay(1000);
+#if 0        
+        while (digitalRead(PA2) == HIGH)
+        {
+            if ((d = (micros() - to)) > 1000000)
+            {
+                log_msg("input handshake (PA2==HIGH) too long: %ld\n", d);
+                break;
+            }
+        }
+        log_msg("input handshake (PA2==HIGH): %ld\n", d);
+#endif        
+        //delay(1000);
+        log_msg("handshake %d\n", i++);
+    }
+#endif
 }
 
 void pp_drv::close(void)
@@ -752,6 +829,9 @@ size_t pp_drv::_write(const void *buf, size_t len)
         cd = c;
     log_msg("0x%02x, /*'%c'*/\n", c, cd);
 #endif
+    in_write = true;
+    setup_snd();
+
     bool was_busy = false;
     t1 = millis();
     while (digitalRead(WRIND) == writing)
@@ -789,8 +869,6 @@ size_t pp_drv::_write(const void *buf, size_t len)
     if (was_busy)
         log_msg("C64 was busy for %ldus: counter PA2=%d, counter SP2=%d.\n", micros() - t2, counter_PA2, counter_SP2);
 #endif
-    in_write = true;
-    setup_snd();
     csent = 0;
     if (!outchar(*str, false))
     {
@@ -803,6 +881,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
         }
         log_msg("...oisdaun, ged eh!\n");
     }
+    //log_msg("%s: sending %d/'%c'\n", __FUNCTION__, *str, (isprint(*str) ? *str : '~'), *str);
     csent++;
     len--;
     str++;
@@ -825,7 +904,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
     else
         _to = to;
     
-    if (xQueueReceive(s2_queue, &ret, _to) == pdTRUE)
+    if (xQueueReceive(s2_queue, &ret, _to /*portMAX_DELAY*/) == pdTRUE)
     {
         if (ret < 0)
         {
