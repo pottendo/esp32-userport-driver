@@ -542,7 +542,7 @@ void pp_drv::drv_ackrcv(void)
 
 void pp_drv::setup_snd(void)
 {
-    digitalWrite(BUSY, HIGH);
+    if (is_amiga) digitalWrite(BUSY, HIGH);
 #pragma GCC unroll 8
     for (uint8_t i = _PB0; i <= _PB7; i++)
     {
@@ -563,7 +563,7 @@ void pp_drv::setup_rcv(void)
         gpio_set_pull_mode(PAR(i), GPIO_FLOATING);
     }
     mode = INPUT;
-    digitalWrite(BUSY, LOW);
+    if (is_amiga) digitalWrite(BUSY, LOW);
     //log_msg_isr(true, "%s: set to RECEIVE mode\n", __FUNCTION__);
 }
 
@@ -596,12 +596,11 @@ void pp_drv::open(void)
     gpio_set_direction(RESET, GPIO_MODE_INPUT);
     gpio_set_pull_mode(RESET, GPIO_PULLDOWN_ONLY);
 
+    gpio_set_direction(BUSY, GPIO_MODE_OUTPUT); // = OE on old HW
     gpio_set_direction(FLAG, GPIO_MODE_OUTPUT);
     gpio_set_direction(static_cast<gpio_num_t>(2), GPIO_MODE_OUTPUT);
-    gpio_set_direction(BUSY, GPIO_MODE_OUTPUT);
 
     gpio_set_level(FLAG, 1);
-    gpio_set_level(BUSY, 0);
     //gpio_set_level(POUT, 0);
 
     mode = INPUT;
@@ -616,6 +615,7 @@ void pp_drv::open(void)
     if (gpio_get_level(RESET) == HIGH)
     {
         log_msg("Amiga detected...\n");
+        gpio_set_level(BUSY, 0);
         is_amiga = true;
         writing = HIGH;
         machine = (char *)"Amiga";
@@ -625,6 +625,7 @@ void pp_drv::open(void)
     else
     {
         log_msg("C64 detected...\n");
+        gpio_set_level(OE, 1);
         writing = LOW;
         machine = (char *)"C64";
         attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
@@ -689,7 +690,7 @@ bool pp_drv::outchar(const char ct, bool from_isr)
         if (gpio_get_level(WRIND) != writing)
         {
             uint8_t bit = (ct & (1 << s)) ? 1 : 0;
-            //log_msg("%c", (bit ? '1' : '0'));
+            //log_msg_isr(from_isr, "%c", (bit ? '1' : '0'));
             gpio_set_level(PAR(s), bit);
         }
         else
@@ -699,7 +700,7 @@ bool pp_drv::outchar(const char ct, bool from_isr)
             break;
         }
     }
-    //log_msg("\n");
+    //log_msg_isr(from_isr, "\n");
     return ret;
 }
 

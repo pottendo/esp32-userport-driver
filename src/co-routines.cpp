@@ -61,6 +61,7 @@ void hexdump(const char *buf, int len)
     int idx = 0;
     int lines = 0;
     char linestr[256];
+    linestr[0] = '\0';
 
     while (len > 0) {
         for (i = 0; i < 16; i++) {

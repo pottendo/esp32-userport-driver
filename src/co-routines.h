@@ -364,12 +364,22 @@ public:
         log_msg("READ: Requested to write %d bytes...\n", b);
         // generate data
         for (int i = 0; i < b; i++)
+        {
             aux_buf[i] = charset_p_topetcii('a' + (i % 27));
+            if ((ret = drv->write(&aux_buf[i], 1)) != 1)
+            {
+                log_msg("READ: write error: %d\n", ret);
+                return ret;
+            }
+            delay(200);
+        }
+#if 0        
         if ((ret = drv->write(aux_buf, b)) != b)
         {
             log_msg("READ: write error: %d\n", ret);
             return ret;
         }
+#endif        
         log_msg("READ: sent\n");
         hexdump(aux_buf, 64);
         // now read back

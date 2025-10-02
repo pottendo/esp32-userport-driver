@@ -120,6 +120,7 @@ protected:
     inline void flag_handshake(void)    /* Amiga uses /ACK */
     {
         digitalWrite(FLAG, LOW);
+        udelay(3);
         digitalWrite(FLAG, HIGH);
     }
     
