@@ -369,17 +369,17 @@ public:
         for (int i = 0; i < b; i++)
         {
             aux_buf[i] = charset_p_topetcii('0' + (i % 10));
-#if 0            
+#if 1            
             if ((ret = drv->write(&aux_buf[i], 1)) != 1)
             {
                 log_msg("READ: write error: %d\n", ret);
                 return ret;
             }
             //printf("READ: sent byte %d/%c\n", aux_buf[i], (isPrintable(aux_buf[i]) ? aux_buf[i] : '~'));
-            //delay(3000);
+            delay(200);
 #endif            
         }
-#if 1           
+#if 0           
         if ((ret = drv->write(aux_buf, b)) != b)
         {
             log_msg("READ: write error: %d\n", ret);

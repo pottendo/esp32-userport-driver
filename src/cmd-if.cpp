@@ -325,13 +325,10 @@ void loop_cmd()
         {
             //log_msg("rc = %d, buf = '%s'\n", rc, buf);
             buf[rc] = '\0';
-            if (!process_cmd(buf))
+            if (process_cmd(buf) < 0)
             {
                 log_msg("Unknown CoRoutine... '%s'\n", buf);
-                log_msg("Hexdump: ");
-                for (int i = 0; i < rc; i++)
-                    log_msg("%02x ", buf[i]);
-                log_msg("\n");
+                hexdump(buf, rc);
             }
             rc = 0;
         }
