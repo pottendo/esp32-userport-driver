@@ -325,7 +325,7 @@ void loop_cmd()
         {
             //log_msg("rc = %d, buf = '%s'\n", rc, buf);
             buf[rc] = '\0';
-            if (process_cmd(buf) < 0)
+            if (!process_cmd(buf))
             {
                 log_msg("Unknown CoRoutine... '%s'\n", buf);
                 hexdump(buf, rc);

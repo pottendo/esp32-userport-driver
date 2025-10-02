@@ -368,8 +368,8 @@ public:
         // generate data
         for (int i = 0; i < b; i++)
         {
-            aux_buf[i] = charset_p_topetcii('0' + (i % 10));
-#if 1            
+            aux_buf[i] = charset_p_topetcii('0' + (i % 16));
+#if 0           
             if ((ret = drv->write(&aux_buf[i], 1)) != 1)
             {
                 log_msg("READ: write error: %d\n", ret);
@@ -379,13 +379,14 @@ public:
             delay(200);
 #endif            
         }
-#if 0           
+#if 1           
         if ((ret = drv->write(aux_buf, b)) != b)
         {
             log_msg("READ: write error: %d\n", ret);
             return ret;
         }
 #endif
+        log_msg("READ: sent %d bytes.\n", b);
         hexdump(aux_buf, 64);
         // now read back
         if ((ret = drv->read(aux_buf2, b)) != b)
@@ -393,6 +394,7 @@ public:
             log_msg("READ: readback error: %d\n", ret);
             return ret;
         }
+        log_msg("READ: readback %d bytes.\n", ret);
         hexdump(aux_buf2, 64);
         if (memcmp(aux_buf, aux_buf2, b) != 0)
         {

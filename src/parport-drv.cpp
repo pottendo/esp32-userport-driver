@@ -130,7 +130,7 @@ void pp_drv::pc2_isr_c64(void)
             log_msg_isr(true, "PC2 ISR input queue full.\n");
         }
         flag_handshake();
-#if 0        
+#if 1        
         unsigned long to = micros();
         while (digitalRead(PA2) == HIGH)
         {
@@ -149,7 +149,7 @@ void pp_drv::pc2_isr_c64(void)
         BaseType_t higherPriorityTaskWoken = pdFALSE;
         //log_msg_isr(true, "pc2 isr - output\n");
         char c;
-#if 1   
+#if 0   
         unsigned long to = micros();
         while (gpio_get_level(PC2) == 0) // wait until /PC2 is de-asserted
         {
@@ -165,6 +165,7 @@ void pp_drv::pc2_isr_c64(void)
         {
             if (xQueueReceiveFromISR(tx_queue, (void *)&c, &higherPriorityTaskWoken) == pdTRUE)
             {
+#if 1                
                 unsigned long to = micros();
                 while ((digitalRead(PA2) == HIGH) && ((micros() - to) < 2500000L))
                     blink(0, 0);
@@ -174,6 +175,7 @@ void pp_drv::pc2_isr_c64(void)
                     err = -BUSY;
                 }
                 else
+#endif                
                 {
                     //log_msg_isr(true, "would send from ISR '%c'\n", c);
                     if (outchar(c, true))
@@ -678,23 +680,23 @@ void pp_drv::open(void)
         }
         //log_msg("input handshake (PA2!=LOW): %ld\n", d);
         gpio_set_level(PB0, 0);
-        gpio_set_level(PB1, 0);
+        gpio_set_level(PB1, 1);
         gpio_set_level(PB2, 0);
-        gpio_set_level(PB3, 0);
+        gpio_set_level(PB3, 1);
         gpio_set_level(PB4, 0);
-        gpio_set_level(PB5, 0);
+        gpio_set_level(PB5, 1);
         gpio_set_level(PB6, 0);
-        gpio_set_level(PB7, 0);
+        gpio_set_level(PB7, 1);
         flag_handshake();
         delay(1000);
         gpio_set_level(PB0, 1);
-        gpio_set_level(PB1, 1);
+        gpio_set_level(PB1, 0);
         gpio_set_level(PB2, 1);
-        gpio_set_level(PB3, 1);
+        gpio_set_level(PB3, 0);
         gpio_set_level(PB4, 1);
-        gpio_set_level(PB5, 1);
+        gpio_set_level(PB5, 0);
         gpio_set_level(PB6, 1);
-        gpio_set_level(PB7, 1);
+        gpio_set_level(PB7, 0);
         flag_handshake();
         delay(1000);
 #if 0        
