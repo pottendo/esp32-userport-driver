@@ -181,7 +181,7 @@ void pp_drv::pc2_isr_c64(void)
                     if (outchar(c, true))
                     {
                         csent++;
-                        //udelay(40);
+                        udelay(40); // needed to get ISR read working
                         flag_handshake();
                     }
                     else
