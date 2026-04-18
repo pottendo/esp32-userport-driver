@@ -531,6 +531,7 @@ void pp_drv::drv_ackrcv(void)
         int32_t err;
         if (xQueueReceive(s1_queue, &err, portMAX_DELAY) == pdTRUE)
         {
+            //log_msg("driver(wsync) got %d bytes sent from ISR, err = %d\n", err, err);
             if (xQueueSend(s2_queue, &err, 20 * portTICK_PERIOD_MS) == pdTRUE)
                 continue;
         }
@@ -808,7 +809,7 @@ size_t pp_drv::_write(const void *buf, size_t len)
     len--;
     str++;
     while (len--)
-    {
+    {   
         if (xQueueSend(tx_queue, str, DEFAULT_WTIMEOUT) != pdTRUE)
             log_msg("xQueueSend failed for %c, remaining: %d\n", *str, len);
         str++;

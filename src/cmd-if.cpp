@@ -86,7 +86,7 @@ int process_cmd(char *cmd)
     }
     log_msg("Unknown command: '%s'\n", cmd);
 out:
-    // log_msg("...done.\n");
+    //log_msg("...done; ret = %d.\n", ret);
     web_send_cmd("CoRoutine#idle");
     return ret;
 }
@@ -311,6 +311,7 @@ void loop_cmd()
     {
         static int8_t rc = 0;
         ret = drv.read(buf + rc, 4 - rc, false);
+        //log_msg("1: ret = %d, rc = %d, xxxbuf = '%s'\n", ret, rc, buf);
         if (ret < 0)
         {
             V(cmd_mutex);
@@ -319,8 +320,8 @@ void loop_cmd()
             return;
         }
         rc += ret;
-        //buf[rc] = '\0';
-        //log_msg("ret = %d, rc = %d, buf = '%s'\n", ret, rc, buf);
+        buf[rc] = '\0';
+        log_msg("ret = %d, rc = %d, buf = '%s'\n", ret, rc, buf);
         if (rc >= 4)
         {
             //log_msg("rc = %d, buf = '%s'\n", rc, buf);

@@ -59,7 +59,7 @@ public:
 
     int match(char *cmd, pp_drv *drv)
     {
-        // log_msg("cmd %s vs. %s\n", cmd, name);
+        //log_msg("cmd %s vs. %s\n", cmd, name);
         if (strncmp(cmd, name.c_str(), 4) == 0)
         {
             web_send_cmd("CoRoutine#" + name);
@@ -76,7 +76,7 @@ public:
         int ret;
         t1 = millis();
         ret = run(drv);
-        //log_msg("CoRoutine %s ran %dms\n", name.c_str(), millis() - t1);
+        log_msg("CoRoutine %s ran %dms - ret = %d\n", name.c_str(), millis() - t1, ret);
         return ret;
     }
     virtual bool setup(void) = 0;
