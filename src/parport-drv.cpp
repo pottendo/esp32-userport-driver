@@ -138,7 +138,7 @@ void pp_drv::pc2_isr_c64(void)
         char c;
 #if 0        
         unsigned long to = micros();
-        while (0 && gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
+        while (gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
         {
             if ((micros() - to) > 500)
             {
@@ -176,9 +176,10 @@ void pp_drv::pc2_isr_c64(void)
                 }
                 // log_msg_isr(true, "pc2 handshake 1 took %ldus\n", micros() - to);
                 unsigned long to = micros();
-                while ((digitalRead(PA2) != LOW) && ((micros() - to) < 2500))
-                    blink(0, 0);
-                if ((micros() - to) > 2000) // was 500, 1850 seen once.
+                while ((digitalRead(PA2) != LOW) && ((micros() - to) < 2000))
+                    ;
+//                    blink(0, 0);
+                if ((micros() - to) > 500) // was 500, 1850 seen once.
                 {
                     log_msg_isr(true, "PC2 ISR write handshake1 (PA==LOW)- C64 not responding for %dus (-2).\n", micros() - to);
                     err = -2;
@@ -219,7 +220,7 @@ void pp_drv::pc2_isr_c64(void)
             }
             csent = 0;
         }
-        //udelay(25); // was 15, testing for soft80
+        //udelay(50); // was 15, testing for soft80
     }
     if (higherPriorityTaskWoken != pdFALSE)
         portYIELD_FROM_ISR();
