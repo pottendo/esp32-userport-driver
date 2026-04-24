@@ -114,8 +114,9 @@ protected:
     void pc2_isr_c64(void);
     void drv_ackrcv(void);
     bool outchar(const char c, bool from_isr);
-    size_t _write(const void *s, size_t len);
+    ssize_t _write(const void *s, size_t len);
     void drv_body();
+    void setup_isr(bool on);
 
     inline void flag_handshake(void)    /* Amiga uses /ACK */
     {
@@ -134,8 +135,9 @@ public:
     void close(void);
     inline bool is_amiga_drv(void) { return is_amiga; }
     int writestr(String &s) { return write(s.c_str(), s.length()); }
-    size_t write(const void *s, size_t len);
-    size_t write(uint8_t c) { return write((const char *)(&c), 1); }
+    ssize_t write(const void *s, size_t len);
+    ssize_t write(uint8_t c) { return write((const char *)(&c), 1); }
+    ssize_t sync_write(const void *buf, size_t len);
     uint32_t set_wtimeout(uint32_t _to) { uint32_t t = to; to = _to; return t; }
     void sync4write(void);
     ssize_t read(void *buf, size_t len, bool block = true);

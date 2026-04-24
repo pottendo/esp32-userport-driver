@@ -136,24 +136,22 @@ void pp_drv::pc2_isr_c64(void)
         BaseType_t higherPriorityTaskWoken = pdFALSE;
         // log_msg_isr(true, "pc2 isr - output1 - %d\n", higherPriorityTaskWoken);
         char c;
-#if 0        
-        unsigned long to = micros();
-        while (gpio_get_level(PC2) == 0) // wait until /STROBE is de-asserted
-        {
-            if ((micros() - to) > 500)
-            {
-                log_msg_isr(true, "/PC2 not deasserted for >500us.\n");
-                break;
-            }
-            blink(0, 0);
-            log_msg_isr(true, "/PC2 not deasserted...\n");
-        }
-#endif       
+        unsigned long to;
         if (uxQueueMessagesWaitingFromISR(tx_queue) > 0)
         {
             if (xQueueReceiveFromISR(tx_queue, (void *)&c, &higherPriorityTaskWoken) == pdTRUE)
             {
                 //log_msg_isr(true, "would send from ISR '%c'\n", c);
+#if 0                
+                to = micros();
+                while ((digitalRead(PA2) != LOW) && ((micros() - to) < 2500))
+                    ;
+                if ((micros() - to) > 100) // was 500, 1850 seen once.
+                {
+                    log_msg_isr(true, "PC2 ISR write handshake1 (PA==LOW)- C64 not responding for %dus (-2).\n", micros() - to);
+                    err = -2;
+                }
+#endif                
                 if (outchar(c, true))
                 {
                     csent++;
@@ -166,10 +164,10 @@ void pp_drv::pc2_isr_c64(void)
                     log_msg_isr(true, "PC2 ISR write error EBUSY (%d).\n", err);
                 }
 #if 0
-                unsigned long to = micros();
+                to = micros();
                 while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 2500))
-                    blink(0, 0);
-                if ((micros() - to) > 2000) // was 500, 1850 seen once.
+                    ;
+                if ((micros() - to) > 100) // was 500, 1850 seen once.
                 {
                     log_msg_isr(true, "PC2 ISR write handshake1 (PA==HIGH)- C64 not responding for %dus (-2).\n", micros() - to);
                     err = -2;
@@ -220,7 +218,7 @@ void pp_drv::pc2_isr_c64(void)
             }
             csent = 0;
         }
-        //udelay(50); // was 15, testing for soft80
+        //udelay(60); // was 15, testing for soft80
     }
     if (higherPriorityTaskWoken != pdFALSE)
         portYIELD_FROM_ISR();
@@ -621,8 +619,8 @@ void pp_drv::open(void)
         is_amiga = true;
         writing = HIGH;
         machine = (char *)"Amiga";
-        attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_strobe, FALLING);
         attachInterrupt(digitalPinToInterrupt(RESET), isr_wrapper_reset, FALLING); // doesn't work on Amiga, so not used
+        setup_isr(true); // enable Amiga handshake IRQs
     }
     else
     {
@@ -630,13 +628,31 @@ void pp_drv::open(void)
         gpio_set_level(OE, 1);
         writing = LOW;
         machine = (char *)"C64";
-        attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
+        setup_isr(true); // enable C64 handshake IRQs
         lcd->orientation(2); // upside down for C64
         flag_handshake(); // make sure FLAG is HIGH
     }
     lcd->printf("%s detected...\n", machine);
     attachInterrupt(digitalPinToInterrupt(WRIND), isr_wrapper_write_ind, CHANGE);
     setup_rcv();
+}
+
+void pp_drv::setup_isr(bool on)
+{
+    if (is_amiga)
+    {
+        if (on)
+            attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_strobe, FALLING);
+        else
+            detachInterrupt(digitalPinToInterrupt(PC2));
+    }
+    else
+    {
+        if (on)
+            attachInterrupt(digitalPinToInterrupt(PC2), isr_wrapper_pc2, FALLING);
+        else
+            detachInterrupt(digitalPinToInterrupt(PC2));
+    }
 }
 
 void pp_drv::close(void)
@@ -706,7 +722,7 @@ bool pp_drv::outchar(const char ct, bool from_isr)
     return ret;
 }
 
-size_t pp_drv::write(const void *buf, size_t len)
+ssize_t pp_drv::write(const void *buf, size_t len)
 {
     int32_t wlen = 0, ret;
     unsigned long t1, t2;
@@ -735,7 +751,71 @@ size_t pp_drv::write(const void *buf, size_t len)
     return wlen;
 }
 
-size_t pp_drv::_write(const void *buf, size_t len)
+ssize_t pp_drv::sync_write(const void *buf, size_t len)
+{
+    unsigned long t1, to, tsend1, tsend2;
+    int ret, bw;
+    setup_isr(false);    // disable interrupts to get more timing stability for sync write
+    t1 = millis();
+    while (digitalRead(WRIND) == writing)
+    {
+        if ((millis() - t1) > 10000) // give up after 10s
+        {
+            log_msg("waiting for host to read...\n");
+            t1 = millis();
+            ret = -1;
+            goto out;
+        }
+    }
+
+    if (!is_amiga)
+    {
+        t1 = millis();
+        while (digitalRead(PA2) == HIGH) // now wait until C64 is ready, which is signaled by PA2 going LOW
+        {
+            // log_msg("PA2 == HIGH: %d\n", counter_PA2);
+            // udelay(25);
+            if ((millis() - t1) > 5000) // give up after 5s
+            {
+                log_msg("C64 not responding, giving up...\n");
+                ret = -1;
+                goto out;
+            }
+        }
+    }
+
+    setup_snd();
+    bw = 0;
+    while (bw < len)
+    {
+        // log_msg_isr(true, "pc2 handshake 1 took %ldus\n", micros() - to);
+        to = micros();
+        while ((digitalRead(PA2) != LOW) && ((micros() - to) < 2000))
+            ;
+        tsend2 = micros() - to;
+        if (!outchar(((const char *)buf)[bw], false))
+        {
+            log_msg("sync_write: write error at byte %d, retrying...\n", bw);
+            ret = bw;
+            break;
+        }
+        flag_handshake();
+        to = micros();
+        while ((digitalRead(PA2) != HIGH) && ((micros() - to) < 2500))
+            ;
+        tsend1 = micros() - to;
+        bw++;
+        //log_msg("sync_write: byte %d sent, handshake times: %dus + %dus\n", bw, tsend1, tsend2);
+        udelay(60);
+    }
+    ret = bw;
+out:
+    setup_rcv();
+    setup_isr(true);     // re-enable interrupts for the handshake management, otherwise we might miss handshakes and get out of sync
+    return ret;
+}
+
+ssize_t pp_drv::_write(const void *buf, size_t len)
 {
     const char *str = static_cast<const char *>(buf);
     int32_t ret = -1;

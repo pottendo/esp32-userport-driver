@@ -30,7 +30,7 @@ void loop_cr(void);
 
 int cmp(uint8_t *buf, int len);
 void hexdump(const char *buf, int len);
-
+static int ch = 0;
 class cr_base
 {
 protected:
@@ -76,12 +76,18 @@ public:
         int ret;
         t1 = millis();
         ret = run(drv);
-        log_msg("CoRoutine %s ran %dms - ret = %d\n", name.c_str(), millis() - t1, ret);
+        ch++;
+        log_msg("CoRoutine %s ran %dms - ret = %d, ch = %d\n", name.c_str(), millis() - t1, ret, ch);
         return ret;
     }
     virtual bool setup(void) = 0;
     virtual int run(pp_drv *drv) = 0;
     // virtual void loop(void) = 0;
+    char fillbuf(int i)
+    {
+        if ((i % 8) == 0) ch++;
+        return (((i+ch) & 1) ? 0xff : 0x00);// charset_p_topetcii('a' + ((i + ch++) % 27));
+    }   
 };
 
 typedef uint8_t canvas_t;
@@ -176,10 +182,9 @@ public:
             log_msg("dump too large: %d.\n", b);
             return -E2BIG;
         }
-        static int ch = 0;
         for (int i = 0; i < b; i++)
         {
-            aux_buf[i] = charset_p_topetcii('a' + ((i + ch++) % 27));
+            aux_buf[i] = fillbuf(i);
         }
         //delay(500);
         unsigned long t1, t2;
@@ -335,6 +340,54 @@ public:
     }
 };
 
+class cr_dump5_t : public cr_base
+{
+    size_t chunk_size;
+public:
+    cr_dump5_t(const char *n, size_t cs) : cr_base(String{n}), chunk_size(cs) { reg(); }
+    ~cr_dump5_t() = default;
+
+    bool setup(void) override { return true; };
+    int run(pp_drv *drv) override
+    {
+        int ret;
+        if ((ret = drv->read(aux_buf, 2)) != 2)
+        {
+            log_msg("read error: %d\n", ret);
+            return ret;
+        }
+        int b = aux_buf[0] + aux_buf[1] * 256;
+
+        log_msg("Coroutine dump for %d bytes\n", b);
+        if (b >= MAX_AUX)
+        {
+            log_msg("dump too large: %d.\n", b);
+            return -E2BIG;
+        }
+        static int ch = 0;
+        for (int i = 0; i < b; i++)
+        {
+            aux_buf[i] = fillbuf(i);
+        }
+        //delay(500);
+        unsigned long t1, t2;
+        t1 = millis();
+        if ((ret = drv->sync_write(aux_buf, b)) != b)
+        {
+            log_msg("write error: %d\n", ret);
+            return ret;
+        }
+        t2 = millis();
+        float baud;
+        log_msg("sent %d chars in ", ret);
+        log_msg("%dms(", t2 - t1);
+        baud = ((float)ret) / (t2 - t1) * 8000;
+        log_msg("%.0f BAUD)\n", baud);
+
+        return true;
+    }
+};
+
 class cr_read_t : public cr_base
 {
     uint8_t *canvas;
@@ -365,7 +418,7 @@ public:
         // generate data
         for (int i = 0; i < b; i++)
         {
-            aux_buf[i] = charset_p_topetcii('a' + (i % 27));
+            aux_buf[i] = fillbuf(i);
             if ((ret = drv->write(&aux_buf[i], 1)) != 1)
             {
                 log_msg("READ: write error: %d\n", ret);

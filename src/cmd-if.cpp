@@ -321,7 +321,7 @@ void loop_cmd()
         }
         rc += ret;
         buf[rc] = '\0';
-        log_msg("ret = %d, rc = %d, buf = '%s'\n", ret, rc, buf);
+        //log_msg("ret = %d, rc = %d, buf = '%s'\n", ret, rc, buf);
         if (rc >= 4)
         {
             //log_msg("rc = %d, buf = '%s'\n", rc, buf);
