@@ -77,7 +77,7 @@ public:
         t1 = millis();
         ret = run(drv);
         ch++;
-        log_msg("CoRoutine %s ran %dms - ret = %d, ch = %d\n", name.c_str(), millis() - t1, ret, ch);
+        //log_msg("CoRoutine %s ran %dms - ret = %d, ch = %d\n", name.c_str(), millis() - t1, ret, ch);
         return ret;
     }
     virtual bool setup(void) = 0;

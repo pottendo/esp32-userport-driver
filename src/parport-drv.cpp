@@ -151,11 +151,12 @@ void pp_drv::pc2_isr_c64(void)
                     log_msg_isr(true, "PC2 ISR write handshake1 (PA==LOW)- C64 not responding for %dus (-2).\n", micros() - to);
                     err = -2;
                 }
-#endif                
+#endif   
+                //udelay(60); // this is needed if ISR reading is used, otherwise stack overflow happens on host side
+
                 if (outchar(c, true))
                 {
                     csent++;
-                    //udelay(40);
                     flag_handshake();
                 }
                 else
@@ -218,7 +219,6 @@ void pp_drv::pc2_isr_c64(void)
             }
             csent = 0;
         }
-        //udelay(60); // was 15, testing for soft80
     }
     if (higherPriorityTaskWoken != pdFALSE)
         portYIELD_FROM_ISR();
