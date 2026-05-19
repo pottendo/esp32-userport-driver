@@ -38,8 +38,8 @@ void loop_cr(void)
 
 #define NO_THREADS 4
 #define MAX_ITER 128
-#define IMG_W 640 // 320
-#define IMG_H 200 // 200
+#define IMG_W 800 // 320
+#define IMG_H 600 // 200
 #define CSIZE (IMG_W * IMG_H) / 8
 #define PIXELW 1 // 2
 #define PAL_SIZE (2 * PIXELW)
@@ -50,8 +50,9 @@ static canvas_t *_canvas; // local copy ptr for cmp - ugly hack XXX
 #include "mandelbrot.h"
 bool cr_mandel_t::setup()
 {
-    _canvas = canvas = new uint8_t[CSIZE];
-    memset(canvas, 0x0, CSIZE);
+    _canvas = canvas = nullptr; //new uint8_t[CSIZE];
+    if (canvas)
+        memset(canvas, 0x0, CSIZE);
     m = (void *)new mandel<MTYPE>{-1.5, -1.0, 0.5, 1.0, IMG_W / PIXELW, IMG_H, canvas, this};
     return true;
 }
@@ -103,21 +104,22 @@ int cr_mandel_t::run(pp_drv *drv)
 {
     int ret;
     log_msg("Coroutine mandel\n");
-    ret = drv->read(aux_buf, 6);
-    if (ret != 6)
+    ret = drv->read(aux_buf, 8);
+    if (ret != 8)
     {
         log_msg("mandel parm incomplete: %d\n", ret);
         return false;
     }
-    hexdump(aux_buf, 6);
+    hexdump(aux_buf, 8);
     
-    point_t ps{aux_buf[0] + aux_buf[1] * 256, aux_buf[2]};
-    point_t pe{aux_buf[3] + aux_buf[4] * 256, aux_buf[5]};
+    point_t ps{aux_buf[0] + aux_buf[1] * 256, aux_buf[2] + aux_buf[3] * 256};
+    point_t pe{aux_buf[4] + aux_buf[5] * 256, aux_buf[6] + aux_buf[7] * 256};
     ps.x /= PIXELW;
     pe.x /= PIXELW;
     log_msg("mandel screen: {%d,%d} x {%d,%d}, canvas=%p\n", ps.x, ps.y, pe.x, pe.y, canvas);
     // canvas_dump(canvas);
-    memset(canvas, 0x0, CSIZE);
+    if (canvas)
+        memset(canvas, 0x0, CSIZE);
     ((mandel<MTYPE> *)m)->select_start(ps);
     ((mandel<MTYPE> *)m)->select_end(pe);
 #ifdef MANDEL_LIVE_TRACK
@@ -165,14 +167,15 @@ void cr_mandel_t::canvas_setpx(canvas_t *canvas, coord_t x, coord_t y, color_t c
     aux_buf[1] = val;
     aux_buf[2] = x % 256;
     aux_buf[3] = x / 256;
-    aux_buf[4] = y;
+    aux_buf[4] = y % 256;
+    aux_buf[5] = y / 256;
 
     // log_msg("sending: %d/%d %d\n", x, y, c);
-    int ret = drv->write(aux_buf, 5);
-    if (ret != 5)
+    int ret = drv->sync_write(aux_buf, 6);
+    if (ret != 6)
         log_msg("coroutine plot, write error: %d\n", ret);
     V(pixmutex);
-//#else
+#else
     const uint lineb = IMG_W / 8 * 8; // line 8 bytes per 8x8 pixel
     const uint colb = 8;              // 8 bytes per 8x8 pixel
 
@@ -397,13 +400,15 @@ int cr_plot_t::run(pp_drv *drv)
         {
             for (int x = 0; x < 320; x++)
             {
+                int y = 100 + it * sin(x * PI / 160.0);
                 aux_buf[0] = x % 256;
                 aux_buf[1] = x / 256;
-                aux_buf[2] = 100 + it * sin(x * PI / 160.0);
-                aux_buf[3] = 1 << (7 - (x % 8)); // don't care about MC
+                aux_buf[2] = y;
+                aux_buf[3] = y / 256;
+                aux_buf[4] = 1 << (7 - (x % 8)); // don't care about MC
 
-                ret = drv->write(aux_buf, 4);
-                if (ret != 4)
+                ret = drv->write(aux_buf, 5);
+                if (ret != 5)
                 {
                     log_msg("coroutine plot, write error: %d\n", ret);
                     r = ret;
