@@ -86,7 +86,8 @@ public:
     char fillbuf(int i)
     {
         if ((i % 8) == 0) ch++;
-        return (((i+ch) & 1) ? 0xff : 0x00);// charset_p_topetcii('a' + ((i + ch++) % 27));
+        //return (((i+ch) & 1) ? 0xff : 0x00);
+        return charset_p_topetcii('a' + ((i + ch++) % 27));
     }   
 };
 

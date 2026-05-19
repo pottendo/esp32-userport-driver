@@ -38,10 +38,10 @@ void loop_cr(void)
 
 #define NO_THREADS 4
 #define MAX_ITER 128
-#define IMG_W 320 // 320
+#define IMG_W 640 // 320
 #define IMG_H 200 // 200
 #define CSIZE (IMG_W * IMG_H) / 8
-#define PIXELW 2 // 2
+#define PIXELW 1 // 2
 #define PAL_SIZE (2 * PIXELW)
 #define MTYPE double
 
